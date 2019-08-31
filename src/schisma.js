@@ -54,7 +54,7 @@ class Schisma {
         this.$type      = new Schisma(o.$type).$type
         this.$validate  = o.$validate
         this.$required  = o.$required
-        this.$default   = o.$default
+        this.$default   = o.$default || o.$type instanceof Function ? o.$type(0) : undefined
       } else {                         // Traversable Obj.
         this.$type = {}
         for(let [k, v] of Object.entries(o)) {
@@ -62,7 +62,8 @@ class Schisma {
         }
       }
     } else {                           // Primitives.
-      this.$type = typeof o(0)
+      this.$default = o()
+      this.$type    = typeof this.$default
     }
   }
   /**
@@ -126,18 +127,42 @@ class Schisma {
     }
     return errors
   }
-  conform(o, keepBadValues) {
+  conform(o, conf={allowBadLength:false,allowUnexpected:false,allowMissing:false}) {
+    if (this.$type instanceof Object) {
+    }
     // TODO: Generate a version of passed object that conforms to the schema, optionally removing unexpected keys.
   }
+  /**
+   * create creates a new object that conforms to schema using computed or
+   * provided default values. If there is no $default value provided for a
+   * key, then whatever that key represents will be created with the
+   * type's default constructor. 
+   * 
+   * @returns {Object} object conforming to the schema's definition.
+   */
   create() {
-    // TODO: Create an object based upon schema using defaults.
+    if (Array.isArray(this.$type)) {
+      let a = []
+      for (let i = 0; i < this.$type.length; i++) {
+        a[i] = this.$type[i].create()
+      }
+      return a
+    } else if (this.$type instanceof Object) {
+      let o = {}
+      for (let [k, v] of Object.entries(this.$type)) {
+        o[k] = this.$type[k].create()
+      }
+      return o
+    } else {
+      return this.$default
+    }
   }
 }
 
 let schA = new Schisma({
   a: Number,
   b: Symbol,
-  c: [Boolean, BigInt],
+  c: [Boolean],
   d: {
     dA: String,
   },
@@ -149,6 +174,20 @@ let schA = new Schisma({
   i: {
     $type: Boolean,
   },
+  j: {
+    jA: {
+      jAa: Number,
+      jAb: {
+        $type: String,
+        $default: "Hey"
+      },
+      jAc: {
+        $type: {
+          jAcA: Number
+        }
+      }
+    }
+  }
 })
 
 let objA = {
@@ -167,3 +206,7 @@ let errors = schA.validate(objA, { allowBadLength: false, allowUnexpected: false
 console.log(errors)
 
 let parsed = schA.conform(objA)
+
+let defObj = schA.create()
+console.log(defObj)
+console.log(schA.validate(defObj))

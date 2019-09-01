@@ -38,6 +38,7 @@ Objects passed to schisma can be declared a variety of ways.
   * As a primitive type.
   * As a containing object.
   * As a schisma-style object.
+  * An Schisma instance.
   * As an Array of any of the previous.
 
 ##### Primitive Types
@@ -116,6 +117,20 @@ Unlike the other value declarations, schisma-style objects are how you can provi
     }
   },
 }
+```
+##### Schisma Instance
+Schisma instances can also be used as values.
+
+```
+let ChildSchema = schisma({
+  childPropA: Number,
+  childPropB: String,
+})
+
+let ParentSchema = schisma({
+  child: ChildSchema,
+  children: [ChildSchema],
+})
 ```
 
 ### Schema Validation

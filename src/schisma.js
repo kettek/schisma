@@ -13,6 +13,11 @@ class Schisma {
   static get Error() {
     return SchismaError
   }
+  /**
+   * Parses a provided object into a schisma schemata.
+   *
+   * @param {Object} o Object to be parsed.
+   */
   _understand(o) {
     if (Array.isArray(o)) {            // Array of some type.
       this.$type = o.map(v => new Schisma(v))
@@ -22,6 +27,7 @@ class Schisma {
       if (o.hasOwnProperty('$type') || o.hasOwnProperty('$validate')) { // Guaranteed SchismaConf
         let sch         = new Schisma(o.$type)
         this.$type      = sch.$type
+        this.$ctor      = o.$type
         this.$validate  = o.$validate
         this.$required  = o.$required
         this.$default   = o.$default || sch.$default
@@ -40,31 +46,31 @@ class Schisma {
     }
   }
   /**
-   * validates the provided object against the schema.
+   * Validates the provided object against the schema.
    * @param {Object} o Object to validate.
    * @param {Object} [conf] Configuration for fine-tuning what is considered an error.
-   * @param {Object} [conf.allowBadLength=false] Allows arrays to be shorter than the schema defines.
-   * @param {Object} [conf.allowUnexpected=false] Ignores unexpected object keys.
-   * @param {Object} [conf.allowMissing=false] Ignores missing object keys.
+   * @param {Object} [conf.ignoreBadLength=false] Ignores arrays that are shorter than the schema defines.
+   * @param {Object} [conf.ignoreUnexpected=false] Ignores unexpected object keys.
+   * @param {Object} [conf.ignoreMissing=false] Ignores missing object keys.
    * @returns {{code: Number, value: Any, where: String, message: String, expected: String, received: String}[]} Array of errors
    */
-  validate(o,conf={allowBadLength:false,allowUnexpected:false,allowMissing:false},dot='') {
+  validate(o,conf={ignoreBadLength:false,ignoreUnexpected:false,ignoreMissing:false},dot='') {
     let errors = []
     // Validate if user has provided such a function.
     if (this.$validate) {
       let validation_error = this.$validate(o, dot)
       if (validation_error !== undefined) {
-        errors.push(new SchismaError(SchismaError.INVALID, {...{message: `${dot} failed validation`, value: o, where: dot}, ...validation_error}))
+        errors.push(new SchismaError(SchismaError.INVALID, {...{message: `failed validation`, value: o, where: dot}, ...validation_error}))
       }
       return errors
     }
     // Check arrays.
     if (Array.isArray(o)) {
       if (!Array.isArray(this.$type)) {
-        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `${dot} is of wrong type`, expected: this.$type, received: 'array', value: o, where: dot}))
+        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: 'array', value: o, where: dot}))
       } else {
-        if (o.length < this.$type.length && !conf.allowBadLength) {
-          errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `${dot} is too short`, expected: this.$type.length, received: o.length, value: o, where: dot}))
+        if (o.length < this.$type.length && !conf.ignoreBadLength) {
+          errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `array too short`, expected: this.$type.length, received: o.length, value: o, where: dot}))
         } else {
           // Check each element on o's Array against schema's type modulo schema's type length. This means we pattern match.
           for (let i = 0; i < o.length; i++) {
@@ -75,17 +81,17 @@ class Schisma {
     // Check objects.
     } else if (typeof o === 'object') {
       if (!(this.$type instanceof Object)) {
-        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `${dot} is of wrong type`, expected: this.$type, received: typeof o, value:o, where: dot}))
+        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: typeof o, value:o, where: dot}))
       } else {
         // Generate a list of common keys and check if they are unexpected, missing, or fail validation.
         for (let k of new Set([...Object.keys(this.$type), ...Object.keys(o)])) {
           if (!this.$type.hasOwnProperty(k)) {
-            if (!conf.allowUnexpected) {
+            if (!conf.ignoreUnexpected) {
               errors.push(new SchismaError(SchismaError.UNEXPECTED_KEY, {message: `.${k} is unexpected`, value: o[k], where: dot}))
             }
           } else if (!o.hasOwnProperty(k)) {
-            if (this.$type[k].$required || !conf.allowMissing) {
-              errors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `.${k} is required`, expected: this.$type[k].$type, where: dot}))
+            if (this.$type[k].$required || !conf.ignoreMissing) {
+              errors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `.${k} is required`, expected: this.$type[k].$type, where: dot, received: 'undefined'}))
             }
           } else {
             errors = [...errors, ...this.$type[k].validate(o[k], conf, `${dot}.${k}`)]
@@ -95,20 +101,20 @@ class Schisma {
     // Check primitives.
     } else {
       if (typeof o !== this.$type) {
-        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `${dot} is of wrong type`, expected: this.$type, received: typeof o, value: o, where: dot}))
+        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: typeof o, value: o, where: dot}))
       }
     }
     return errors
   }
   /**
-   * conforms the provided object to match the schema. Mis-matched types are
+   * Conforms the provided object to match the schema. Mis-matched types are
    * converted to their proper types when possible.
    * @param {Object} o 
    * @param {Object} [conf] Configuration for fine-tuning how conforming works.
    * @param {Object} [conf.removeUnexpected=true] Removes unexpected object keys.
    * @param {Object} [conf.insertMissing=true] Inserts missing object keys with default values.
    */
-  conform(o, conf={removeUnexpected:true, insertMissing:true}) {
+  conform(o, conf={removeUnexpected:true, insertMissing:true}, dot=``) {
     // Check arrays.
     if (Array.isArray(o)) {
       if (!Array.isArray(this.$type)) {
@@ -117,7 +123,7 @@ class Schisma {
         let arr = [...o.slice(0, o.length), ...this.$default.slice(o.length)]
         // Check each element on o's Array against schema's type modulo schema's type length. This means we pattern match.
         for (let i = 0; i < arr.length; i++) {
-          arr[i] = this.$type[i%this.$type.length].conform(arr[i], conf)
+          arr[i] = this.$type[i%this.$type.length].conform(arr[i], conf, `${dot}[${i}]`)
         }
         return arr
       }
@@ -135,10 +141,10 @@ class Schisma {
             }
           } else if (!o.hasOwnProperty(k)) {
             if (conf.insertMissing) {
-              c[k] = this.$type[k].$default
+              c[k] = (this.$type[k].$default instanceof Function ? this.$type[k].$default() : this.$type[k].$default)
             }
           } else {
-            c[k] = this.$type[k].conform(o[k], conf)
+            c[k] = this.$type[k].conform(o[k], conf, `${dot}.${k}`)
           }
         }
         return c
@@ -152,7 +158,7 @@ class Schisma {
     }
   }
   /**
-   * create creates a new object that conforms to schema using computed or
+   * Creates a new object that conforms to schema using computed or
    * provided default values. If there is no $default value provided for a
    * key, then whatever that key represents will be created with the
    * type's default constructor. 
@@ -173,7 +179,7 @@ class Schisma {
       }
       return o
     } else {
-      return this.$default
+      return this.$default instanceof Function ? this.$default() : this.$default
     }
   }
 }
@@ -209,3 +215,10 @@ class SchismaError {
     return 5
   }
 }
+
+function schisma(newSchema) {
+  return new Schisma(newSchema)
+}
+schisma.SchismaError = SchismaError
+
+module.exports = schisma

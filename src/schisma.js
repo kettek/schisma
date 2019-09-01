@@ -22,7 +22,13 @@ class Schisma {
       this.$default = this.$type.map(v => v.$default)
       // TODO: we need some stringified $type that converts deep arrays/objects into full k=>v pairs, kinda like JSON.stringify, but for types only.
     } else if (typeof o === 'object') {
-      if (o.hasOwnProperty('$type') || o.hasOwnProperty('$validate')) { // Guaranteed SchismaConf
+      if (o instanceof Schisma) {
+        this.$type     = o.$type
+        this.$ctor     = o.$ctor
+        this.$validate = o.$validate
+        this.$required = o.$required
+        this.$default  = o.$default
+      } else if (o.hasOwnProperty('$type') || o.hasOwnProperty('$validate')) { // Guaranteed SchismaConf
         let sch         = new Schisma(o.$type)
         this.$type      = sch.$type
         this.$ctor      = o.$type

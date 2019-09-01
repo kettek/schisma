@@ -161,21 +161,25 @@ class Schisma {
    * Creates a new object that conforms to schema using computed or
    * provided default values. If there is no $default value provided for a
    * key, then whatever that key represents will be created with the
-   * type's default constructor. 
-   * 
+   * type's default constructor.
+   *
+   * @param {Object} [conf] Configuration for fine-tuning creation.
+   * @param {Object} [conf.populateArrays=false] Whether or not arrays should be populated with default instances of their elements.
    * @returns {Object} object conforming to the schema's definition.
    */
-  create() {
+  create(conf={populateArrays:false}) {
     if (Array.isArray(this.$type)) {
       let a = []
-      for (let i = 0; i < this.$type.length; i++) {
-        a[i] = this.$type[i].create()
+      if (conf.populateArrays == true) {
+        for (let i = 0; i < this.$type.length; i++) {
+          a[i] = this.$type[i].create(conf)
+        }
       }
       return a
     } else if (this.$type instanceof Object) {
       let o = {}
       for (let [k, v] of Object.entries(this.$type)) {
-        o[k] = this.$type[k].create()
+        o[k] = this.$type[k].create(conf)
       }
       return o
     } else {

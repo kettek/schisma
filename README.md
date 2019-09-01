@@ -240,8 +240,16 @@ Schisma can create a default object that conforms to its schema.
 ```
 let newPerson = mySchema.create()
 /* Returns:
+{ name: '', age: 75, owns: { apples: 0, cats: [] } }
+*/
+```
+
+Just like validate and conform, create can take options to adjust object creation.
+```
+let newPerson = mySchema.create({populateArrays: true})
+/* Returns:
 { name: '',
-  age: 96, <-- randomized!
+  age: 81,
   owns: { apples: 0, cats: [ { hairless: false, age: 0 } ] } }
 */
 ```

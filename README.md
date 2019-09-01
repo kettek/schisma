@@ -87,7 +87,7 @@ Unlike the other value declarations, schisma-style objects are how you can provi
 {
   mouse: {
     manufacturer: {
-    $type: String,
+      $type: String,
       $default: "Grojitech",
       $validate: v => {
         switch(v) {

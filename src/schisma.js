@@ -73,6 +73,7 @@ class Schisma {
           errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `array too short`, expected: this.$type.length, received: o.length, value: o, where: dot}))
         } else {
           // Check each element on o's Array against schema's type modulo schema's type length. This means we pattern match.
+          // TODO: Add conf for validating against patterns or types that match any element of the array. This will allow both pattern matching as well as allowing select types be elements in the array.
           for (let i = 0; i < o.length; i++) {
             errors = [...errors, ...this.$type[i%this.$type.length].validate(o[i], conf, `${dot}[${i}]`)]
           }

@@ -19,7 +19,6 @@ class Schisma {
   _understand(o) {
     if (Array.isArray(o)) {            // Array of some type.
       this.$type = o.map(v => new Schisma(v))
-      this.$default = this.$type.map(v => v.$default)
       // TODO: we need some stringified $type that converts deep arrays/objects into full k=>v pairs, kinda like JSON.stringify, but for types only.
     } else if (typeof o === 'object') {
       if (o instanceof Schisma) {
@@ -37,16 +36,13 @@ class Schisma {
         this.$default   = o.$default || sch.$default
       } else {                         // Traversable Obj.
         this.$type = {}
-        this.$default = {}
         for(let [k, v] of Object.entries(o)) {
           this.$type[k] = new Schisma(v)
-          this.$default[k] = this.$type[k].$default
         }
       }
     } else {                           // Primitives.
       this.$ctor    = o
-      this.$default = o()
-      this.$type    = typeof this.$default
+      this.$type    = typeof o()
     }
   }
   /**
@@ -59,7 +55,8 @@ class Schisma {
    * @param {Object} [conf.matchArrayLength=false] Array length must match schema's array length.
    * @returns {{code: Number, value: Any, where: String, message: String, expected: String, received: String}[]} Array of errors
    */
-  validate(o,conf={ignoreUnexpected:false,ignoreMissing:false,matchArray:"any",matchArrayLength:false},dot='') {
+  validate(o,conf={},dot='') {
+    conf = {...{ignoreUnexpected:false,ignoreMissing:false,matchArray:"any",matchArrayLength:false}, ...conf}
     let errors = []
     // Validate if user has provided such a function.
     if (this.$validate) {
@@ -83,6 +80,7 @@ class Schisma {
         } else if (conf.matchArray == 'any') {        // Match any item in [type, type, ...]
           for (let i = 0; i < o.length; i++) {
             let match = false
+            // TODO: Hueristics matching against o[i] and this.$type[i]
             for (let j = 0; j < this.$type.length; j++) {
               if (this.$type[j].validate(o[i], conf, '').length == 0) {
                 match = true
@@ -132,35 +130,39 @@ class Schisma {
    * @param {Object} [conf.insertMissing=true] Inserts missing object keys with default values.
    * @param {Object} [conf.matchArray="any"] Matches arrays by either "any" type contained or by a "pattern" of types.
    * @param {Object} [conf.matchArrayLength=false] Resizes arrays that do not match the length of the schema's array.
+   * @param {Object} [conf.populateArrays=true] Whether or not arrays should be populated with default instances of their schema elements if they do not exist.
    */
-  conform(o, conf={removeUnexpected:true, insertMissing:true, matchArray:'any', matchArrayLength:false}, dot=``) {
+  conform(o, conf={}, dot=``) {
+    conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', matchArrayLength:false, populateArrays:true}, ...conf}
     // Check arrays.
     if (Array.isArray(o)) {
       if (!Array.isArray(this.$type)) {
-        return this.$default
+        return this.create(conf)
       } else {
         let arr = []
         if (conf.matchArrayLength) {
-          arr = [...o.slice(0, this.$default.length), ...this.$default.slice(o.length)]
+          let def = this.create(conf)
+          arr = [...o.slice(0, def.length), ...def.slice(o.length)]
         } else {
           arr = [...o]
         }
-        if (conf.matchArray == 'pattern') {    // Match explicit pattern of [type, type, ...]
-          // Check each element on o's Array against schema's type modulo schema's type length. This means we pattern match.
+        // Match explicit pattern of [type, type, ...]
+        if (conf.matchArray == 'pattern') {
           for (let i = 0; i < arr.length; i++) {
             arr[i] = this.$type[i%this.$type.length].conform(arr[i], conf, `${dot}[${i}]`)
           }
-        } else if (conf.matchArray == 'any') {        // Match any item in [type, type, ...]
+        // Match any item in [type, type, ...]
+        } else if (conf.matchArray == 'any') {
           for (let i = 0; i < arr.length; i++) {
-            let match = false
-            for (let j = 0; j < this.$type.length; j++) {
-              if (this.$type[j].validate(arr[i], conf, '').length == 0) {
-                match = true
-                break
-              }
-            }
-            if (!match) {
+            // Find the closest potential type match.
+            let matches = this.$type.map(v=>Schisma._heuristicsMatch(arr[i], v))
+            let bestIndex = matches.indexOf(Math.max(...matches.filter(v=>v>=0)))
+            // If none is found, remove the item
+            if (bestIndex <= -1 && conf.removeUnexpected) {
               arr.splice(i--, 1)
+            // Otherwise conform the item to the best match.
+            } else {
+              arr[i] = this.$type[bestIndex].conform(arr[i], conf, `${dot}[${i}]`)
             }
           }
         }
@@ -169,7 +171,7 @@ class Schisma {
     // Check objects.
     } else if (typeof o === 'object') {
       if (!(this.$type instanceof Object)) {
-        return this.$default
+        return this.create(conf)
       } else {
         // Generate a list of common keys and check if they are unexpected, missing, or fail validation.
         let c = {}
@@ -180,7 +182,7 @@ class Schisma {
             }
           } else if (!o.hasOwnProperty(k)) {
             if (conf.insertMissing) {
-              c[k] = (this.$type[k].$default instanceof Function ? this.$type[k].$default() : this.$type[k].$default)
+              c[k] = this.$type[k].create(conf)
             }
           } else {
             c[k] = this.$type[k].conform(o[k], conf, `${dot}.${k}`)
@@ -197,32 +199,89 @@ class Schisma {
     }
   }
   /**
+   * Checks potential match between o(Object) and t(Schisma). Higher values represent a higher likelihood of an accurate match.
+   */
+  static _heuristicsMatch(o, t) {
+    let value = 0
+    if (Array.isArray(o)) {
+      if (!Array.isArray(t.$type)) {
+        value--
+      } else {
+        for (let i = 0; i < t.$type; i++) {
+          if (typeof t.$type[i] !== typeof o[i]) {
+            value--
+          } else {
+            value++
+          }
+        }
+      }
+    } else if (o instanceof Object) {
+      if (Array.isArray(t.$type) || !(t.$type instanceof Object)) {
+        value--
+      } else {
+        for (let [k, v] of Object.entries(o)) {
+          if (t.$type[k] !== undefined && typeof t.$type[k] == typeof o[k]) {
+            value++
+          }
+        }
+      }
+    } else {
+      if (typeof t.$type == typeof o) {
+        value++
+      }
+    }
+    return value
+  }
+  /**
    * Creates a new object that conforms to schema using computed or
    * provided default values. If there is no $default value provided for a
    * key, then whatever that key represents will be created with the
    * type's default constructor.
    *
    * @param {Object} [conf] Configuration for fine-tuning creation.
-   * @param {Object} [conf.populateArrays=false] Whether or not arrays should be populated with default instances of their elements.
+   * @param {Object} [conf.populateArrays=true] Whether or not arrays should be populated with default instances of their elements.
    * @returns {Object} object conforming to the schema's definition.
    */
-  create(conf={populateArrays:false}) {
-    if (Array.isArray(this.$type)) {
-      let a = []
-      if (conf.populateArrays == true) {
-        for (let i = 0; i < this.$type.length; i++) {
-          a[i] = this.$type[i].create(conf)
+  create(conf={}) {
+    conf = {...{populateArrays:true},...conf}
+    if (this.$default) {
+      return this.$default instanceof Function ? this.$default() : Schisma._deepClone(this.$default)
+    } else {
+      if (Array.isArray(this.$type)) {
+        if (conf.populateArrays) {
+          return this.$type.map(v => v.create(conf))
+        } else {
+          return []
         }
+      } else if (this.$type instanceof Object) {
+        let defaults = {}
+        for(let [k, v] of Object.entries(this.$type)) {
+          defaults[k] = v.create(conf)
+        }
+        return defaults
+      } else {
+        return this.$ctor()
+      }
+    }
+  }
+  /**
+   * Deep copies a value.
+   */
+  static _deepClone(v) {
+    if (Array.isArray(v)) {
+      let a = []
+      for (let i = 0; i < v.length; i++) {
+        a[i] = Schisma._deepClone(v[i])
       }
       return a
-    } else if (this.$type instanceof Object) {
+    } else if (v instanceof Object) {
       let o = {}
-      for (let [k, v] of Object.entries(this.$type)) {
-        o[k] = this.$type[k].create(conf)
+      for (let [key, value] of Object.entries(v)) {
+        o[key] = Schisma._deepClone(value)
       }
       return o
     } else {
-      return this.$default instanceof Function ? this.$default() : this.$default
+      return v
     }
   }
 }

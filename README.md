@@ -180,7 +180,14 @@ mySchema.validate(myPersonhood)
 */
 ```
 
-Options can also be passed to validate:
+Options can also be passed to validate.
+
+| option | value | default | description
+|-|-|-|-|
+| **ignoreUnexpected** | `Boolean` | *false* | Ignores unexpected object keys.
+| **ignoreMissing**    | `Boolean` | *false* | Ignores missing object keys.
+| **matchArray**       | `String`  | *"any"* | Matches array elements against either "any" type contained or by a "pattern" of types.
+| **matchArrayLength** | `Boolean` | *false* | Array length must match schema's array length.
 
 ```
 mySchema.validate(myPersonhood, {ignoreUnexpected: true, ignoreMissing: true})
@@ -221,6 +228,14 @@ let conformedPerson = mySchema.conform(myPersonhood)
 ```
 
 Just like validate, conform can also take options to adjust the output.
+
+| option | value | default | description
+|-|-|-|-|
+| **removeUnexpected** | `Boolean` | *true*  | Removes unexpected object keys.
+| **insertMissing**    | `Boolean` | *true*  | Inserts missing object keys with default values.
+| **matchArray**       | `String`  | *"any"* | Matches arrays by either "any" type contained or by a "pattern" of types.
+| **matchArrayLength** | `Boolean` | *false* | Resizes arrays that do not match the length of the schema's array.
+
 ```
 let conformedPerson2 = mySchema.conform(myPersonhood, {removeUnexpected: false, insertMissing: false})
 /* Returns:
@@ -245,6 +260,11 @@ let newPerson = mySchema.create()
 ```
 
 Just like validate and conform, create can take options to adjust object creation.
+
+| option | value | default | description
+|-|-|-|-|
+| **populateArray**    | `Boolean` | *false* | Whether or not arrays should be populated with default instances of their elements.
+
 ```
 let newPerson = mySchema.create({populateArrays: true})
 /* Returns:

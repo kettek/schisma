@@ -1,3 +1,4 @@
+const SchismaError = require('./schisma_error.js')
 /**
  * Schisma represents a schema used to validate or conform an object structure.
  * It can also be used to create new objects that use the schema's defaults.
@@ -9,9 +10,6 @@ class Schisma {
     this.$default   = null
     this.$validate  = null
     this._understand(root)
-  }
-  static get Error() {
-    return SchismaError
   }
   /**
    * Parses a provided object into a schisma schemata.
@@ -49,12 +47,13 @@ class Schisma {
    * Validates the provided object against the schema.
    * @param {Object} o Object to validate.
    * @param {Object} [conf] Configuration for fine-tuning what is considered an error.
-   * @param {Object} [conf.ignoreBadLength=false] Ignores arrays that are shorter than the schema defines.
    * @param {Object} [conf.ignoreUnexpected=false] Ignores unexpected object keys.
    * @param {Object} [conf.ignoreMissing=false] Ignores missing object keys.
+   * @param {Object} [conf.matchArray="any"] Matches array by either "any" type contained or by a "pattern" of types.
+   * @param {Object} [conf.matchArrayLength=false] Array length must match schema's array length.
    * @returns {{code: Number, value: Any, where: String, message: String, expected: String, received: String}[]} Array of errors
    */
-  validate(o,conf={ignoreBadLength:false,ignoreUnexpected:false,ignoreMissing:false},dot='') {
+  validate(o,conf={ignoreUnexpected:false,ignoreMissing:false,matchArray:"any",matchArrayLength:false},dot='') {
     let errors = []
     // Validate if user has provided such a function.
     if (this.$validate) {
@@ -69,13 +68,24 @@ class Schisma {
       if (!Array.isArray(this.$type)) {
         errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: 'array', value: o, where: dot}))
       } else {
-        if (o.length < this.$type.length && !conf.ignoreBadLength) {
-          errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `array too short`, expected: this.$type.length, received: o.length, value: o, where: dot}))
-        } else {
-          // Check each element on o's Array against schema's type modulo schema's type length. This means we pattern match.
-          // TODO: Add conf for validating against patterns or types that match any element of the array. This will allow both pattern matching as well as allowing select types be elements in the array.
+        if (o.length != this.$type.length && conf.matchArrayLength) { // Check for length differences if desired.
+          errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `wrong length`, expected: this.$type.length, received: o.length, value: o, where: dot}))
+        } else if (conf.matchArray == 'pattern') {    // Match explicit pattern of [type, type, ...]
           for (let i = 0; i < o.length; i++) {
             errors = [...errors, ...this.$type[i%this.$type.length].validate(o[i], conf, `${dot}[${i}]`)]
+          }
+        } else if (conf.matchArray == 'any') {        // Match any item in [type, type, ...]
+          for (let i = 0; i < o.length; i++) {
+            let match = false
+            for (let j = 0; j < this.$type.length; j++) {
+              if (this.$type[j].validate(o[i], conf, '').length == 0) {
+                match = true
+                break
+              }
+            }
+            if (!match) {
+              errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong types`, expected: this.$type.map(t=>t.$type).join(','), received: typeof o, value: o, where: dot}))
+            }
           }
         }
       }
@@ -114,17 +124,39 @@ class Schisma {
    * @param {Object} [conf] Configuration for fine-tuning how conforming works.
    * @param {Object} [conf.removeUnexpected=true] Removes unexpected object keys.
    * @param {Object} [conf.insertMissing=true] Inserts missing object keys with default values.
+   * @param {Object} [conf.matchArray="any"] Matches arrays by either "any" type contained or by a "pattern" of types.
+   * @param {Object} [conf.matchArrayLength=false] Resizes arrays that do not match the length of the schema's array.
    */
-  conform(o, conf={removeUnexpected:true, insertMissing:true}, dot=``) {
+  conform(o, conf={removeUnexpected:true, insertMissing:true, matchArray:'any', matchArrayLength:false}, dot=``) {
     // Check arrays.
     if (Array.isArray(o)) {
       if (!Array.isArray(this.$type)) {
         return this.$default
       } else {
-        let arr = [...o.slice(0, o.length), ...this.$default.slice(o.length)]
-        // Check each element on o's Array against schema's type modulo schema's type length. This means we pattern match.
-        for (let i = 0; i < arr.length; i++) {
-          arr[i] = this.$type[i%this.$type.length].conform(arr[i], conf, `${dot}[${i}]`)
+        let arr = []
+        if (conf.matchArrayLength) {
+          arr = [...o.slice(0, this.$default.length), ...this.$default.slice(o.length)]
+        } else {
+          arr = [...o]
+        }
+        if (conf.matchArray == 'pattern') {    // Match explicit pattern of [type, type, ...]
+          // Check each element on o's Array against schema's type modulo schema's type length. This means we pattern match.
+          for (let i = 0; i < arr.length; i++) {
+            arr[i] = this.$type[i%this.$type.length].conform(arr[i], conf, `${dot}[${i}]`)
+          }
+        } else if (conf.matchArray == 'any') {        // Match any item in [type, type, ...]
+          for (let i = 0; i < arr.length; i++) {
+            let match = false
+            for (let j = 0; j < this.$type.length; j++) {
+              if (this.$type[j].validate(arr[i], conf, '').length == 0) {
+                match = true
+                break
+              }
+            }
+            if (!match) {
+              arr.splice(i--, 1)
+            }
+          }
         }
         return arr
       }
@@ -186,38 +218,6 @@ class Schisma {
     } else {
       return this.$default instanceof Function ? this.$default() : this.$default
     }
-  }
-}
-
-/**
- * SchismaError is the type used to create errors during schema validation.
- */
-class SchismaError {
-  constructor(code=0, extra) {
-    this.code     = code
-    if (extra.value !== undefined) this.value = extra.value
-    if (extra.where !== undefined) this.where = extra.where
-    if (extra.message !== undefined)  this.message  = extra.message
-    if (extra.expected !== undefined) this.expected = extra.expected
-    if (extra.received !== undefined) this.received = extra.received
-  }
-  static get UNHANDLED() {
-    return 0
-  }
-  static get BAD_TYPE() {
-    return 1
-  }
-  static get UNEXPECTED_KEY() {
-    return 2
-  }
-  static get MISSING_KEY() {
-    return 3
-  }
-  static get BAD_LENGTH() {
-    return 4
-  }
-  static get INVALID() {
-    return 5
   }
 }
 

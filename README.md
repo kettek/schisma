@@ -36,7 +36,7 @@ let mySchema = schisma({
 Objects passed to schisma can be declared a variety of ways.
 
   * As a primitive type.
-	* As a containing object.
+  * As a containing object.
   * As a schisma-style object.
   * As an Array of any of the previous.
 
@@ -56,10 +56,10 @@ Objects can be used to compose more complex schemas. The key-value pairs can use
 ```
 {
   mouse: {
-		manufacturer: String,
+    manufacturer: String,
     buttons: Number,
-		dpi: Number,
-	},
+    dpi: Number,
+  },
 }
 ```
 
@@ -86,11 +86,11 @@ Unlike the other value declarations, schisma-style objects are how you can provi
 ```
 {
   mouse: {
-		manufacturer: {
-			$type: String,
+    manufacturer: {
+    $type: String,
       $default: "Grojitech",
       $validate: v => {
-				switch(v) {
+        switch(v) {
           case 'Grojitech':
           case 'Bricoshift':
           case 'Tacerr':
@@ -98,9 +98,9 @@ Unlike the other value declarations, schisma-style objects are how you can provi
             return
           default:
             return {expected: 'Grojitech, Bricoshift, Tacerr, or Loresair'}
-				}
+        }
       },
-		},
+    },
     buttons: {
       $type: Number,
       $default: () => { return new Date%2400 },
@@ -114,7 +114,7 @@ Unlike the other value declarations, schisma-style objects are how you can provi
       $type: Number,
       $required: true,
     }
-	},
+  },
 }
 ```
 

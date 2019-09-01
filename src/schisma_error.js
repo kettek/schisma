@@ -30,4 +30,4 @@ class SchismaError {
   }
 }
 
-module.exports = SchismaError
+export default SchismaError

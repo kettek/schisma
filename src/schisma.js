@@ -1,4 +1,4 @@
-const SchismaError = require('./schisma_error.js')
+import SchismaError from './schisma_error.js'
 /**
  * Schisma represents a schema used to validate or conform an object structure.
  * It can also be used to create new objects that use the schema's defaults.
@@ -226,4 +226,4 @@ function schisma(newSchema) {
 }
 schisma.SchismaError = SchismaError
 
-module.exports = schisma
+export default schisma

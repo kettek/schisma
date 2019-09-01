@@ -4,7 +4,8 @@
   "description": "Schema validator, conformer, and object creator",
   "main": "dist/schisma.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup src/schisma.js --file dist/schisma.js --format umd --name schisma"
   },
   "repository": {
     "type": "git",
@@ -18,5 +19,8 @@
     "creator"
   ],
   "author": "Ketchetwahmeegwun T. Southall <kettek1@kettek.net> (https://kettek.net)",
-  "license": "LGPL-3.0"
+  "license": "LGPL-3.0",
+  "devDependencies": {
+    "rollup": "^1.20.3"
+  }
 }

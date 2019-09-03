@@ -6,7 +6,7 @@ import SchismaError from './schisma_error.js'
 class Schisma {
   constructor(root) {
     this.$type      = null
-    this.$required  = false
+    this.$required  = true
     this.$default   = null
     this.$validate  = null
     this._understand(root)
@@ -50,14 +50,14 @@ class Schisma {
    * @param {Object} o Object to validate.
    * @param {Object} [conf] Configuration for fine-tuning what is considered an error.
    * @param {Object} [conf.ignoreUnexpected=false] Ignores unexpected object keys.
-   * @param {Object} [conf.ignoreMissing=false] Ignores missing object keys.
-   * @param {Object} [conf.ignoreShortArrays=true] Ignores arrays that are longer than the schema's array.
-   * @param {Object} [conf.ignoreLongArrays=true] Ignores arrays that are shorter than the schema's array.
+   * @param {Object} [conf.ignoreRequired=false] Ignores required object keys.
+   * @param {Object} [conf.ignoreShortArrays=true] Ignores arrays that are shorter than the schema's array.
+   * @param {Object} [conf.ignoreLongArrays=true] Ignores arrays that are longer than the schema's array.
    * @param {Object} [conf.matchArray="any"] Matches array by either "any" type contained or by a "pattern" of types.
    * @returns {{code: Number, value: Any, where: String, message: String, expected: String, received: String}[]} Array of errors
    */
   validate(o,conf={},dot='') {
-    conf = {...{ignoreUnexpected:false,ignoreMissing:false,ignoreShortArrays:true,ignoreLongArrays:true,matchArray:"any"}, ...conf}
+    conf = {...{ignoreUnexpected:false,ignoreRequired:false,ignoreShortArrays:true,ignoreLongArrays:true,matchArray:"any"}, ...conf}
     let errors = []
     // Validate if user has provided such a function.
     if (this.$validate) {
@@ -109,7 +109,7 @@ class Schisma {
               errors.push(new SchismaError(SchismaError.UNEXPECTED_KEY, {message: `.${k} is unexpected`, value: o[k], where: dot}))
             }
           } else if (!o.hasOwnProperty(k)) {
-            if (this.$type[k].$required || !conf.ignoreMissing) {
+            if (this.$type[k].$required || !conf.ignoreRequired) {
               errors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `.${k} is required`, expected: this.$type[k].$type, where: dot, received: 'undefined'}))
             }
           } else {
@@ -133,9 +133,9 @@ class Schisma {
    * @param {Object} [conf.removeUnexpected=true] Removes unexpected object keys.
    * @param {Object} [conf.insertMissing=true] Inserts missing object keys with default values.
    * @param {Object} [conf.matchArray="any"] Matches arrays by either "any" type contained or by a "pattern" of types.
-   * @param {Object} [conf.growArrays=false] Grows arrays to match the length of the schema's array.
+   * @param {Object} [conf.growArrays=false] Grow arrays to match the length of the schema's array.
    * @param {Object} [conf.shrinkArrays=false] Shrink arrays to match the length of the schema's array.
-   * @param {Object} [conf.populateArrays=true] Whether or not empty arrays should be populated with default instances of their schema elements.
+   * @param {Object} [conf.populateArrays=true] Populate empty arrays with default instances of their schema elements.
    */
   conform(o, conf={}, dot=``) {
     conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', growArrays: false, shrinkArrays: false, populateArrays:true}, ...conf}
@@ -249,11 +249,11 @@ class Schisma {
    * type's default constructor.
    *
    * @param {Object} [conf] Configuration for fine-tuning creation.
-   * @param {Object} [conf.populateArrays=true] Whether or not arrays should be populated with default instances of their elements.
+   * @param {Object} [conf.populateArrays=false] Whether or not arrays should be populated with default instances of their elements.
    * @returns {Object} object conforming to the schema's definition.
    */
   create(conf={}) {
-    conf = {...{populateArrays:true},...conf}
+    conf = {...{populateArrays:false},...conf}
     if (this.$default) {
       return this.$default instanceof Function ? this.$default() : Schisma._deepClone(this.$default)
     } else {

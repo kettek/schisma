@@ -76,7 +76,7 @@ A Schisma-style object can also be used.
 Unlike the other value declarations, schisma-style objects are how you can provide validation and default value generation.
 
   * **$type** *<Any>* - May be a primitive type, an array, or another object, as per the schisma formatting rules.
-  * **[$default]** *<Any|Function>* - The default value to use when inserting value or generating a default object. If it is a function, then the return value of said function is used.
+  * **[$default]** *<Any|Function>* - The default value to use when inserting a value or generating a default object. If it is a function, then the return value of said function is used.
   * **[$required]** *<Boolean>* - Whether the value should be considered as required for validation and conforming. *Defaults to true*
   * **[$validate]** *<Function(value,where)>* - The function used to validate the value. May return an object that is merged with the resulting SchismaError with any of the following fields:
     * **[value]** - The value of the entry. *Defaults to the object's original value*
@@ -200,12 +200,14 @@ Options can also be passed to validate.
 | option | value | default | description
 |-|-|-|-|
 | **ignoreUnexpected** | `Boolean` | *false* | Ignores unexpected object keys.
-| **ignoreMissing**    | `Boolean` | *false* | Ignores missing object keys.
+| **ignoreRequired**    | `Boolean` | *true* | Ignores required object keys.
+| **ignoreShortArrays** | `Boolean` | *true* | Ignores arrays that are shorter than the schema's array.
+| **ignoreLongArrays** | `Boolean` | *true* | Ignores arrays that are longer than the schema's array.
 | **matchArray**       | `String`  | *"any"* | Matches array elements against either "any" type contained or by a "pattern" of types.
-| **matchArrayLength** | `Boolean` | *false* | Array length must match schema's array length.
+
 
 ```
-mySchema.validate(myPersonhood, {ignoreUnexpected: true, ignoreMissing: true})
+mySchema.validate(myPersonhood, {ignoreUnexpected: true, ignoreRequired: true})
 /* Returns:
 [ SchismaError {
     code: 5,
@@ -249,7 +251,9 @@ Just like validate, conform can also take options to adjust the output.
 | **removeUnexpected** | `Boolean` | *true*  | Removes unexpected object keys.
 | **insertMissing**    | `Boolean` | *true*  | Inserts missing object keys with default values.
 | **matchArray**       | `String`  | *"any"* | Matches arrays by either "any" type contained or by a "pattern" of types.
-| **matchArrayLength** | `Boolean` | *false* | Resizes arrays that do not match the length of the schema's array.
+| **growArrays**       | `Boolean` | *false* | Grow arrays to match the length of the schema's array.
+| **shrinkArrays**     | `Boolean` | *false* | Shrink arrays to match the length of the schema's array.
+| **populateArrays**   | `Boolean` | *true*  | Populate empty arrays with default instances of their schema elements.
 
 ```
 let conformedPerson2 = mySchema.conform(myPersonhood, {removeUnexpected: false, insertMissing: false})
@@ -278,10 +282,10 @@ Just like validate and conform, create can take options to adjust object creatio
 
 | option | value | default | description
 |-|-|-|-|
-| **populateArray**    | `Boolean` | *false* | Whether or not arrays should be populated with default instances of their elements.
+| **populateArrays**    | `Boolean` | *false* | Populate arrays with default instances of their schema elements.
 
 ```
-let newPerson = mySchema.create({populateArrays: true})
+let newPerson = mySchema.create({populateArrays: false})
 /* Returns:
 { name: '',
   age: 81,

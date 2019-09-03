@@ -38,7 +38,7 @@ Objects passed to schisma can be declared a variety of ways.
   * As a primitive type.
   * As a containing object.
   * As a schisma-style object.
-  * An Schisma instance.
+  * As a Schisma instance.
   * As an Array of any of the previous.
 
 ##### Primitive Types
@@ -200,7 +200,7 @@ Options can also be passed to validate.
 | option | value | default | description
 |-|-|-|-|
 | **ignoreUnexpected** | `Boolean` | *false* | Ignores unexpected object keys.
-| **ignoreRequired**    | `Boolean` | *true* | Ignores required object keys.
+| **ignoreRequired**    | `Boolean` | *false* | Ignores required object keys.
 | **ignoreShortArrays** | `Boolean` | *true* | Ignores arrays that are shorter than the schema's array.
 | **ignoreLongArrays** | `Boolean` | *true* | Ignores arrays that are longer than the schema's array.
 | **matchArray**       | `String`  | *"any"* | Matches array elements against either "any" type contained or by a "pattern" of types.

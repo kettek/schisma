@@ -51,12 +51,13 @@ class Schisma {
    * @param {Object} [conf] Configuration for fine-tuning what is considered an error.
    * @param {Object} [conf.ignoreUnexpected=false] Ignores unexpected object keys.
    * @param {Object} [conf.ignoreMissing=false] Ignores missing object keys.
+   * @param {Object} [conf.ignoreShortArrays=true] Ignores arrays that are longer than the schema's array.
+   * @param {Object} [conf.ignoreLongArrays=true] Ignores arrays that are shorter than the schema's array.
    * @param {Object} [conf.matchArray="any"] Matches array by either "any" type contained or by a "pattern" of types.
-   * @param {Object} [conf.matchArrayLength=false] Array length must match schema's array length.
    * @returns {{code: Number, value: Any, where: String, message: String, expected: String, received: String}[]} Array of errors
    */
   validate(o,conf={},dot='') {
-    conf = {...{ignoreUnexpected:false,ignoreMissing:false,matchArray:"any",matchArrayLength:false}, ...conf}
+    conf = {...{ignoreUnexpected:false,ignoreMissing:false,ignoreShortArrays:true,ignoreLongArrays:true,matchArray:"any"}, ...conf}
     let errors = []
     // Validate if user has provided such a function.
     if (this.$validate) {
@@ -71,9 +72,12 @@ class Schisma {
       if (!Array.isArray(this.$type)) {
         errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: 'array', value: o, where: dot}))
       } else {
-        if (o.length != this.$type.length && conf.matchArrayLength) { // Check for length differences if desired.
+        if (o.length < this.$type.length && !conf.ignoreShortArrays) {
           errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `wrong length`, expected: this.$type.length, received: o.length, value: o, where: dot}))
-        } else if (conf.matchArray == 'pattern') {    // Match explicit pattern of [type, type, ...]
+        } else if (o.length > this.$type.length && !conf.ignoreLongArrays) {
+          errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `wrong length`, expected: this.$type.length, received: o.length, value: o, where: dot}))
+        }
+        if (conf.matchArray == 'pattern') {    // Match explicit pattern of [type, type, ...]
           for (let i = 0; i < o.length; i++) {
             errors = [...errors, ...this.$type[i%this.$type.length].validate(o[i], conf, `${dot}[${i}]`)]
           }
@@ -129,22 +133,26 @@ class Schisma {
    * @param {Object} [conf.removeUnexpected=true] Removes unexpected object keys.
    * @param {Object} [conf.insertMissing=true] Inserts missing object keys with default values.
    * @param {Object} [conf.matchArray="any"] Matches arrays by either "any" type contained or by a "pattern" of types.
-   * @param {Object} [conf.matchArrayLength=false] Resizes arrays that do not match the length of the schema's array.
-   * @param {Object} [conf.populateArrays=true] Whether or not arrays should be populated with default instances of their schema elements if they do not exist.
+   * @param {Object} [conf.growArrays=false] Grows arrays to match the length of the schema's array.
+   * @param {Object} [conf.shrinkArrays=false] Shrink arrays to match the length of the schema's array.
+   * @param {Object} [conf.populateArrays=true] Whether or not empty arrays should be populated with default instances of their schema elements.
    */
   conform(o, conf={}, dot=``) {
-    conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', matchArrayLength:false, populateArrays:true}, ...conf}
+    conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', growArrays: false, shrinkArrays: false, populateArrays:true}, ...conf}
     // Check arrays.
     if (Array.isArray(o)) {
       if (!Array.isArray(this.$type)) {
         return this.create(conf)
       } else {
         let arr = []
-        if (conf.matchArrayLength) {
+        // Grow or shrink arrays if desired.
+        if (o.length < this.$type.length && conf.growArrays) {
           let def = this.create(conf)
-          arr = [...o.slice(0, def.length), ...def.slice(o.length)]
+          arr = [...o, ...def.slice(o.length, this.$type.length)]
+        } else if (o.length > this.$type.length && conf.shrinkArrays) {
+          arr = [...o.slice(0, this.$type.length)]
         } else {
-          arr = [...o]
+          arr = o
         }
         // Match explicit pattern of [type, type, ...]
         if (conf.matchArray == 'pattern') {
@@ -155,7 +163,7 @@ class Schisma {
         } else if (conf.matchArray == 'any') {
           for (let i = 0; i < arr.length; i++) {
             // Find the closest potential type match.
-            let matches = this.$type.map(v=>Schisma._heuristicsMatch(arr[i], v))
+            let matches = this.$type.map(v=>Schisma._heuristicsMatch(arr[i], v, conf))
             let bestIndex = matches.indexOf(Math.max(...matches.filter(v=>v>=0)))
             // If none is found, remove the item
             if (bestIndex <= -1 && conf.removeUnexpected) {
@@ -201,14 +209,16 @@ class Schisma {
   /**
    * Checks potential match between o(Object) and t(Schisma). Higher values represent a higher likelihood of an accurate match.
    */
-  static _heuristicsMatch(o, t) {
+  static _heuristicsMatch(o, t, conf) {
     let value = 0
     if (Array.isArray(o)) {
       if (!Array.isArray(t.$type)) {
         value--
       } else {
-        for (let i = 0; i < t.$type; i++) {
-          if (typeof t.$type[i] !== typeof o[i]) {
+        for (let i = 0; i < o.length; i++) {
+          let matches = t.$type.map(v=>Schisma._heuristicsMatch(o[i], v, conf))
+          let bestIndex = matches.indexOf(Math.max(...matches.filter(v=>v>0)))
+          if (bestIndex == -1) {
             value--
           } else {
             value++
@@ -220,14 +230,14 @@ class Schisma {
         value--
       } else {
         for (let [k, v] of Object.entries(o)) {
-          if (t.$type[k] !== undefined && typeof t.$type[k] == typeof o[k]) {
-            value++
-          }
+          value += Schisma._heuristicsMatch(o[k], t.$type[k])
         }
       }
     } else {
-      if (typeof t.$type == typeof o) {
+      if (t.$type == typeof o) {
         value++
+      } else {
+        value--
       }
     }
     return value

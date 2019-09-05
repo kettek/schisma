@@ -267,7 +267,11 @@
           value--;
         } else {
           for (let [k, v] of Object.entries(o)) {
-            value += Schisma._heuristicsMatch(o[k], t.$type[k]);
+            if (!t.$type.hasOwnProperty(k)) {
+              value--;
+            } else {
+              value += Schisma._heuristicsMatch(o[k], t.$type[k]);
+            }
           }
         }
       } else {

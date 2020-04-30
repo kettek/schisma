@@ -180,7 +180,7 @@ class Schisma {
     // Check primitives.
     } else {
       if (!this.$typeof.find(type => typeof o === (type instanceof Schisma ? type.$type : type))) {
-        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: typeof o, value: o, where: dot}))
+        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$typeof.map(type => type instanceof Schisma ? type.$type : type), received: typeof o, value: o, where: dot}))
       }
     }
     return errors

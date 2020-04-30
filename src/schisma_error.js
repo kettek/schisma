@@ -9,6 +9,7 @@ class SchismaError {
     if (extra.message !== undefined)  this.message  = extra.message
     if (extra.expected !== undefined) this.expected = extra.expected
     if (extra.received !== undefined) this.received = extra.received
+    if (extra.errors !== undefined) this.errors = extra.errors
   }
   static get UNHANDLED() {
     return 0

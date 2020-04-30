@@ -7,7 +7,7 @@ class Schisma {
   constructor(root) {
     this.$type      = null
     this.$required  = true
-    this.$default   = null
+    this.$default   = undefined
     this.$validate  = null
     this._understand(root)
   }
@@ -19,30 +19,43 @@ class Schisma {
   _understand(o) {
     if (Array.isArray(o)) {            // Array of some type.
       this.$type = o.map(v => new Schisma(v))
+      this.$typeof = [this.$type]
       // TODO: we need some stringified $type that converts deep arrays/objects into full k=>v pairs, kinda like JSON.stringify, but for types only.
     } else if (typeof o === 'object') {
       if (o instanceof Schisma) {
         this.$type     = o.$type
+        this.$typeof   = [o.$type]
         this.$ctor     = o.$ctor
         this.$validate = o.$validate
-        this.$required = o.$required
+        this.$required = o.$required !== undefined ? o.$required : true
         this.$default  = o.$default
+      } else if (o.hasOwnProperty('$typeof')) {
+        let schs        = o.$typeof.map(t => new Schisma(t))
+        this.$type      = schs[0]
+        this.$typeof    = schs.map(t => t.$type)
+        this.$ctor      = o.$typeof
+        this.$validate  = o.$validate
+        this.$required  = o.$required !== undefined ? o.$required : true
+        this.$default   = o.$default
       } else if (o.hasOwnProperty('$type') || o.hasOwnProperty('$validate')) { // Guaranteed SchismaConf
         let sch         = new Schisma(o.$type)
         this.$type      = sch.$type
+        this.$typeof    = [this.$type]
         this.$ctor      = o.$type
         this.$validate  = o.$validate
-        this.$required  = o.$required
+        this.$required  = o.$required !== undefined ? o.$required : true
         this.$default   = o.$default || sch.$default
       } else {                         // Traversable Obj.
         this.$type = {}
         for(let [k, v] of Object.entries(o)) {
           this.$type[k] = new Schisma(v)
         }
+        this.$typeof = [this.$type]
       }
     } else {                           // Primitives.
       this.$ctor    = o
       this.$type    = typeof o()
+      this.$typeof  = [this.$type]
     }
   }
   /**
@@ -54,10 +67,30 @@ class Schisma {
    * @param {Object} [conf.ignoreShortArrays=true] Ignores arrays that are shorter than the schema's array.
    * @param {Object} [conf.ignoreLongArrays=true] Ignores arrays that are longer than the schema's array.
    * @param {Object} [conf.matchArray="any"] Matches array by either "any" type contained or by a "pattern" of types.
+   * @param {Object} [conf.flattenErrors=true] Flattens errors into a single array.
    * @returns {{code: Number, value: Any, where: String, message: String, expected: String, received: String}[]} Array of errors
    */
-  validate(o,conf={},dot='') {
-    conf = {...{ignoreUnexpected:false,ignoreRequired:false,ignoreShortArrays:true,ignoreLongArrays:true,matchArray:"any"}, ...conf}
+  validate(o, conf={}, dot='') {
+    conf = {...{ignoreUnexpected:false,ignoreRequired:false,ignoreShortArrays:true,ignoreLongArrays:true,matchArray:"any",flattenErrors:true}, ...conf}
+    let errors = this._validate(o, conf, dot)
+    if (conf.flattenErrors) {
+      let toReturn = []
+      let addChildren=err => {
+        if (err.errors) {
+          let nextErrors = err.errors
+          delete err.errors
+          toReturn.push(err)
+          nextErrors.forEach(addChildren)
+        } else {
+          toReturn.push(err)
+        }
+      }
+      errors.forEach(addChildren)
+      return toReturn
+    }
+    return errors
+  }
+  _validate(o,conf={},dot='') {
     let errors = []
     // Validate if user has provided such a function.
     if (this.$validate) {
@@ -69,57 +102,84 @@ class Schisma {
     }
     // Check arrays.
     if (Array.isArray(o)) {
-      if (!Array.isArray(this.$type)) {
-        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: 'array', value: o, where: dot}))
-      } else {
-        if (o.length < this.$type.length && !conf.ignoreShortArrays) {
-          errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `wrong length`, expected: this.$type.length, received: o.length, value: o, where: dot}))
-        } else if (o.length > this.$type.length && !conf.ignoreLongArrays) {
-          errors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `wrong length`, expected: this.$type.length, received: o.length, value: o, where: dot}))
-        }
-        if (conf.matchArray == 'pattern') {    // Match explicit pattern of [type, type, ...]
-          for (let i = 0; i < o.length; i++) {
-            errors = [...errors, ...this.$type[i%this.$type.length].validate(o[i], conf, `${dot}[${i}]`)]
+      let newErrors = []
+      for (let $type of this.$typeof) {
+        let matchErrors = []
+        if (!Array.isArray($type)) {
+          matchErrors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong array type`, expected: $type, received: 'array', value: o, where: dot}))
+        } else {
+          if (o.length < $type.length && !conf.ignoreShortArrays) {
+            matchErrors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `wrong length`, expected: $type.length, received: o.length, value: o, where: dot}))
+          } else if (o.length > $type.length && !conf.ignoreLongArrays) {
+            matchErrors.push(new SchismaError(SchismaError.BAD_LENGTH, {message: `wrong length`, expected: $type.length, received: o.length, value: o, where: dot}))
           }
-        } else if (conf.matchArray == 'any') {        // Match any item in [type, type, ...]
-          for (let i = 0; i < o.length; i++) {
-            let match = false
-            // TODO: Hueristics matching against o[i] and this.$type[i]
-            for (let j = 0; j < this.$type.length; j++) {
-              if (this.$type[j].validate(o[i], conf, '').length == 0) {
-                match = true
-                break
+          if (conf.matchArray == 'pattern') {    // Match explicit pattern of [type, type, ...]
+            for (let i = 0; i < o.length; i++) {
+              matchErrors = [...matchErrors, ...$type[i%$type.length]._validate(o[i], conf, `${dot}.${i}`)]
+            }
+          } else if (conf.matchArray == 'any') {        // Match any item in [type, type, ...]
+            for (let i = 0; i < o.length; i++) {
+              let itemMatchErrors = []
+              // TODO: Hueristics matching against o[i] and this.$type[i]
+              for (let j = 0; j < $type.length; j++) {
+                let validationErrors = $type[j]._validate(o[i], conf, `${dot}.${i}`)
+                if (validationErrors.length === 0) {
+                  itemMatchErrors = []
+                  break
+                } else {
+                  itemMatchErrors = [...itemMatchErrors, ...validationErrors]
+                }
               }
-            }
-            if (!match) {
-              errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong types`, expected: this.$type.map(t=>t.$type).join(','), received: typeof o, value: o, where: dot}))
+              matchErrors = [...matchErrors, ...itemMatchErrors]
             }
           }
+        }
+        if (matchErrors.length === 0) {
+          newErrors = []
+          break
+        } else {
+          newErrors = [...newErrors, ...matchErrors]
         }
       }
+      errors = [...errors, ...newErrors]
     // Check objects.
     } else if (typeof o === 'object') {
-      if (!(this.$type instanceof Object)) {
-        errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: typeof o, value:o, where: dot}))
-      } else {
-        // Generate a list of common keys and check if they are unexpected, missing, or fail validation.
-        for (let k of new Set([...Object.keys(this.$type), ...Object.keys(o)])) {
-          if (!this.$type.hasOwnProperty(k)) {
-            if (!conf.ignoreUnexpected) {
-              errors.push(new SchismaError(SchismaError.UNEXPECTED_KEY, {message: `.${k} is unexpected`, value: o[k], where: dot}))
+      let newErrors = []
+      for (let $type of this.$typeof) {
+        let matchErrors = []
+        if (!($type instanceof Object)) {
+          matchErrors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong object type`, expected: $type, received: typeof o, value:o, where: dot}))
+        } else {
+          // Generate a list of common keys and check if they are unexpected, missing, or fail validation.
+          for (let k of new Set([...Object.keys($type), ...Object.keys(o)])) {
+            if (!$type.hasOwnProperty(k)) {
+              if (!conf.ignoreUnexpected) {
+                matchErrors.push(new SchismaError(SchismaError.UNEXPECTED_KEY, {message: `.${k} is unexpected`, value: o[k], where: `${dot}.${k}`}))
+              }
+            } else if (!o.hasOwnProperty(k)) {
+              if ($type[k].$required && !conf.ignoreRequired) {
+                matchErrors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `.${k} is required`, expected: $type[k].$type, where: `${dot}.${k}`, received: 'undefined'}))
+              }
+            } else {
+              matchErrors = [...matchErrors, ...$type[k]._validate(o[k], conf, `${dot}.${k}`)]
             }
-          } else if (!o.hasOwnProperty(k)) {
-            if (this.$type[k].$required || !conf.ignoreRequired) {
-              errors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `.${k} is required`, expected: this.$type[k].$type, where: dot, received: 'undefined'}))
-            }
-          } else {
-            errors = [...errors, ...this.$type[k].validate(o[k], conf, `${dot}.${k}`)]
           }
         }
+        // We gucci
+        if (matchErrors.length === 0) {
+          newErrors = []
+          break
+        } else {
+          newErrors = [...newErrors, new SchismaError(SchismaError.BAD_TYPE, {
+            message: `incorrect type`, where: dot, received: o,
+            errors: matchErrors
+          })]
+        }
       }
+      errors = [...errors, ...newErrors]
     // Check primitives.
     } else {
-      if (typeof o !== this.$type) {
+      if (!this.$typeof.find(type => typeof o === (type instanceof Schisma ? type.$type : type))) {
         errors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong type`, expected: this.$type, received: typeof o, value: o, where: dot}))
       }
     }
@@ -137,114 +197,64 @@ class Schisma {
    * @param {Object} [conf.shrinkArrays=false] Shrink arrays to match the length of the schema's array.
    * @param {Object} [conf.populateArrays=true] Populate empty arrays with default instances of their schema elements.
    */
-  conform(o, conf={}, dot=``) {
-    conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', growArrays: false, shrinkArrays: false, populateArrays:true}, ...conf}
-    // Check arrays.
-    if (Array.isArray(o)) {
-      if (!Array.isArray(this.$type)) {
-        return this.create(conf)
-      } else {
-        let arr = []
-        // Grow or shrink arrays if desired.
-        if (o.length < this.$type.length && conf.growArrays) {
-          let def = this.create(conf)
-          arr = [...o, ...def.slice(o.length, this.$type.length)]
-        } else if (o.length > this.$type.length && conf.shrinkArrays) {
-          arr = [...o.slice(0, this.$type.length)]
-        } else {
-          arr = o
-        }
-        // Match explicit pattern of [type, type, ...]
-        if (conf.matchArray == 'pattern') {
-          for (let i = 0; i < arr.length; i++) {
-            arr[i] = this.$type[i%this.$type.length].conform(arr[i], conf, `${dot}[${i}]`)
-          }
-        // Match any item in [type, type, ...]
-        } else if (conf.matchArray == 'any') {
-          for (let i = 0; i < arr.length; i++) {
-            // Find the closest potential type match.
-            let matches = this.$type.map(v=>Schisma._heuristicsMatch(arr[i], v, conf))
-            let bestIndex = matches.indexOf(Math.max(...matches.filter(v=>v>=0)))
-            // If none is found, remove the item
-            if (bestIndex <= -1 && conf.removeUnexpected) {
-              arr.splice(i--, 1)
-            // Otherwise conform the item to the best match.
-            } else {
-              arr[i] = this.$type[bestIndex].conform(arr[i], conf, `${dot}[${i}]`)
-            }
-          }
-        }
-        return arr
-      }
-    // Check objects.
-    } else if (typeof o === 'object') {
-      if (!(this.$type instanceof Object)) {
-        return this.create(conf)
-      } else {
-        // Generate a list of common keys and check if they are unexpected, missing, or fail validation.
-        let c = {}
-        for (let k of new Set([...Object.keys(this.$type), ...Object.keys(o)])) {
-          if (!this.$type.hasOwnProperty(k)) {
-            if (!conf.removeUnexpected) {
-              c[k] = o[k]
-            }
-          } else if (!o.hasOwnProperty(k)) {
-            if (conf.insertMissing) {
-              c[k] = this.$type[k].create(conf)
-            }
-          } else {
-            c[k] = this.$type[k].conform(o[k], conf, `${dot}.${k}`)
-          }
-        }
-        return c
-      }
-    // Check primitives.
-    } else {
-      if (typeof o !== this.$type) {
-        return this.$ctor(o)
-      }
-      return o
-    }
+  conform(o, conf={}) {
+    conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', growArrays: false, shrinkArrays: false, populateArrays:true, flattenErrors: false}, ...conf}
+    let validationErrors = this.validate(o, {...{
+      ignoreShortArrays: false, ignoreLongArrays: false
+    }, ...conf})
+    this._conformFromErrors(o, validationErrors, conf)
+    return o
   }
-  /**
-   * Checks potential match between o(Object) and t(Schisma). Higher values represent a higher likelihood of an accurate match.
-   */
-  static _heuristicsMatch(o, t, conf) {
-    let value = 0
-    if (Array.isArray(o)) {
-      if (!Array.isArray(t.$type)) {
-        value--
+  _conformFromErrors(data, errs, conf, fixedDotPaths=new Set()) {
+    if (!errs) return
+    for (let err of errs) {
+      let allKeys = err.where.split('.')
+
+      allKeys = allKeys[0]===''?allKeys.slice(1):allKeys
+
+      let endKey = allKeys.pop()
+
+      if (fixedDotPaths.has(err.where)) continue
+
+      let dataTarget = allKeys.reduce((o, i) => o[i], data)
+
+      if (err.errors) {
+        if (err.code === SchismaError.BAD_TYPE) {
+          this._conformFromErrors(data, err.errors, conf, fixedDotPaths)
+        }
       } else {
-        for (let i = 0; i < o.length; i++) {
-          let matches = t.$type.map(v=>Schisma._heuristicsMatch(o[i], v, conf))
-          let bestIndex = matches.indexOf(Math.max(...matches.filter(v=>v>0)))
-          if (bestIndex == -1) {
-            value--
-          } else {
-            value++
+        let schemaTarget = allKeys.reduce(
+          (o, i) => {
+            // Limit by schema's array length. NOTE: This might not respect pattern/any matching!
+            if (Array.isArray(o)) {
+              return (o[Number(i)%o.length]).$type
+            }
+            return o[i].$type
+          },
+          this.$type
+        )
+        if (err.code === SchismaError.UNEXPECTED_KEY && conf.removeUnexpected) {
+          delete dataTarget[endKey]
+        } else if (err.code === SchismaError.MISSING_KEY && schemaTarget[endKey].$required && !conf.ignoreRequired) {
+          dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey])
+        } else if (err.code === SchismaError.BAD_TYPE) {
+          dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey])
+        } else if (err.code === SchismaError.BAD_LENGTH && (conf.shrinkArrays || conf.growArrays)) {
+          let defaultArray = schemaTarget[endKey].create(conf, dataTarget[endKey])
+          if (dataTarget[endKey].length > defaultArray.length && conf.shrinkArrays) {
+            dataTarget[endKey] = [...dataTarget[endKey].slice(0, defaultArray.length)]
+          } else if (dataTarget[endKey].length < defaultArray.length && conf.growArrays) {
+            dataTarget[endKey] = [...dataTarget[endKey], ...defaultArray.slice(dataTarget[endKey].length, defaultArray.length)]
           }
+        } else if (err.code === SchismaError.INVALID) {
+          dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey])
+        } else {
+          // unhandled
         }
       }
-    } else if (o instanceof Object) {
-      if (Array.isArray(t.$type) || !(t.$type instanceof Object)) {
-        value--
-      } else {
-        for (let [k, v] of Object.entries(o)) {
-          if (!t.$type.hasOwnProperty(k)) {
-            value--
-          } else {
-            value += Schisma._heuristicsMatch(o[k], t.$type[k])
-          }
-        }
-      }
-    } else {
-      if (t.$type == typeof o) {
-        value++
-      } else {
-        value--
-      }
+      fixedDotPaths.add(endKey)
     }
-    return value
+
   }
   /**
    * Creates a new object that conforms to schema using computed or
@@ -254,10 +264,12 @@ class Schisma {
    *
    * @param {Object} [conf] Configuration for fine-tuning creation.
    * @param {Object} [conf.populateArrays=false] Whether or not arrays should be populated with default instances of their elements.
+   * @param {*} [data] Original data that is used for primitive constructors. This allows types to be interpreted as one another when possible.
    * @returns {Object} object conforming to the schema's definition.
    */
-  create(conf={}) {
+  create(conf={}, data=null) {
     conf = {...{populateArrays:false},...conf}
+
     if (this.$default) {
       return this.$default instanceof Function ? this.$default() : Schisma._deepClone(this.$default)
     } else {
@@ -268,13 +280,19 @@ class Schisma {
           return []
         }
       } else if (this.$type instanceof Object) {
+        let $type = this.$type
+        if ($type instanceof Schisma) {
+          $type = $type.$type
+        }
         let defaults = {}
-        for(let [k, v] of Object.entries(this.$type)) {
-          defaults[k] = v.create(conf)
+        for(let [k, v] of Object.entries($type)) {
+          if (v.$required) {
+            defaults[k] = v.create(conf)
+          }
         }
         return defaults
       } else {
-        return this.$ctor()
+        return this.$ctor(data)
       }
     }
   }

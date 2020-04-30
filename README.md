@@ -73,9 +73,18 @@ A Schisma-style object can also be used.
   $default: 20,
 }
 ```
+
+```
+{
+  $typeof: [Number, String],
+  $default: 20,
+}
+```
+
 Unlike the other value declarations, schisma-style objects are how you can provide validation and default value generation.
 
   * **$type** *<Any>* - May be a primitive type, an array, or another object, as per the schisma formatting rules.
+  * **$typeof** [*<Any>*] - An array of any of the types allowed within `$type`. This limits the given field/object's type to be one of the provided types. If `$type` and `$typeof` are used in the same declaration, `$type` will be ignored.
   * **[$default]** *<Any|Function>* - The default value to use when inserting a value or generating a default object. If it is a function, then the return value of said function is used.
   * **[$required]** *<Boolean>* - Whether the value should be considered as required for validation and conforming. *Defaults to true*
   * **[$validate]** *<Function(value,where)>* - The function used to validate the value. May return an object that is merged with the resulting SchismaError with any of the following fields:
@@ -160,37 +169,67 @@ let myPersonhood = {
 
 mySchema.validate(myPersonhood)
 /* Returns:
-[ SchismaError {
-    code: 3,
+[
+  SchismaError {
+    code: 1,
     where: '',
-    message: '.age is required',
-    expected: 'number',
-    received: 'undefined' },
+    message: 'incorrect type',
+    received: { name: 'OXXO', height: 180, owns: [Object] }
+  },
   SchismaError {
     code: 3,
+    where: '.age',
+    message: '.age is required',
+    expected: 'number',
+    received: 'undefined'
+  },
+  SchismaError {
+    code: 1,
     where: '.owns',
+    message: 'incorrect type',
+    received: { cats: [Array] }
+  },
+  SchismaError {
+    code: 3,
+    where: '.owns.apples',
     message: '.apples is required',
     expected: 'number',
-    received: 'undefined' },
+    received: 'undefined'
+  },
+  SchismaError {
+    code: 1,
+    where: '.owns.cats.0',
+    message: 'incorrect type',
+    received: { hairless: true, age: 400 }
+  },
   SchismaError {
     code: 5,
     value: 400,
-    where: '.owns.cats[0].age',
+    where: '.owns.cats.0.age',
     message: 'failed validation',
     expected: '<=38',
-    received: 400 },
+    received: 400
+  },
+  SchismaError {
+    code: 1,
+    where: '.owns.cats.2',
+    message: 'incorrect type',
+    received: { hairless: 'maybe', age: 20 }
+  },
   SchismaError {
     code: 1,
     value: 'maybe',
-    where: '.owns.cats[2].hairless',
+    where: '.owns.cats.2.hairless',
     message: 'wrong type',
-    expected: 'boolean',
-    received: 'string' },
+    expected: [ 'boolean' ],
+    received: 'string'
+  },
   SchismaError {
     code: 2,
     value: 180,
-    where: '',
-    message: '.height is unexpected' }
+    where: '.height',
+    message: '.height is unexpected'
+  }
 ]
 */
 ```
@@ -204,25 +243,53 @@ Options can also be passed to validate.
 | **ignoreShortArrays** | `Boolean` | *true* | Ignores arrays that are shorter than the schema's array.
 | **ignoreLongArrays** | `Boolean` | *true* | Ignores arrays that are longer than the schema's array.
 | **matchArray**       | `String`  | *"any"* | Matches array elements against either "any" type contained or by a "pattern" of types.
+| **flattenErrors**    | `Boolean` | *true*  | Flattens all errors to return as a single array rather than heirarchically.
 
 
 ```
 mySchema.validate(myPersonhood, {ignoreUnexpected: true, ignoreRequired: true})
 /* Returns:
-[ SchismaError {
+[
+  SchismaError {
+    code: 1,
+    where: '',
+    message: 'incorrect type',
+    received: { name: 'OXXO', height: 180, owns: [Object] }
+  },
+  SchismaError {
+    code: 1,
+    where: '.owns',
+    message: 'incorrect type',
+    received: { cats: [Array] }
+  },
+  SchismaError {
+    code: 1,
+    where: '.owns.cats.0',
+    message: 'incorrect type',
+    received: { hairless: true, age: 400 }
+  },
+  SchismaError {
     code: 5,
     value: 400,
-    where: '.owns.cats[0].age',
+    where: '.owns.cats.0.age',
     message: 'failed validation',
     expected: '<=38',
-    received: 400 },
+    received: 400
+  },
+  SchismaError {
+    code: 1,
+    where: '.owns.cats.2',
+    message: 'incorrect type',
+    received: { hairless: 'maybe', age: 20 }
+  },
   SchismaError {
     code: 1,
     value: 'maybe',
-    where: '.owns.cats[2].hairless',
+    where: '.owns.cats.2.hairless',
     message: 'wrong type',
-    expected: 'boolean',
-    received: 'string' }
+    expected: [ 'boolean' ],
+    received: 'string'
+  }
 ]
 */
 ```

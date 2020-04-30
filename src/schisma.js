@@ -44,7 +44,7 @@ class Schisma {
         this.$ctor      = o.$type
         this.$validate  = o.$validate
         this.$required  = o.$required !== undefined ? o.$required : true
-        this.$default   = o.$default || sch.$default
+        this.$default   = o.$default !== undefined ? o.$default : sch.$default
       } else {                         // Traversable Obj.
         this.$type = {}
         for(let [k, v] of Object.entries(o)) {

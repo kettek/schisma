@@ -306,7 +306,7 @@
     create(conf={}, data=null) {
       conf = {...{populateArrays:false},...conf};
 
-      if (this.$default) {
+      if (this.$default !== undefined) {
         return this.$default instanceof Function ? this.$default() : Schisma._deepClone(this.$default)
       } else {
         if (Array.isArray(this.$type)) {

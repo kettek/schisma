@@ -320,7 +320,7 @@ Just like validate, conform can also take options to adjust the output.
 | **matchArray**       | `String`  | *"any"* | Matches arrays by either "any" type contained or by a "pattern" of types.
 | **growArrays**       | `Boolean` | *false* | Grow arrays to match the length of the schema's array.
 | **shrinkArrays**     | `Boolean` | *false* | Shrink arrays to match the length of the schema's array.
-| **populateArrays**   | `Boolean` | *true*  | Populate empty arrays with default instances of their schema elements.
+| **populateArrays**   | `Boolean` | *false*  | Populate empty arrays with default instances of their schema elements.
 
 ```
 let conformedPerson2 = mySchema.conform(myPersonhood, {removeUnexpected: false, insertMissing: false})

@@ -261,6 +261,7 @@
             this._conformFromErrors(data, err.errors, conf, fixedDotPaths);
           }
         } else {
+          // Should we use err.expected instead of schemaTarget? We're doing so in MISSING_KEY.
           let schemaTarget = allKeys.reduce(
             (o, i) => {
               // Limit by schema's array length. NOTE: This might not respect pattern/any matching!
@@ -273,8 +274,8 @@
           );
           if (err.code === SchismaError.UNEXPECTED_KEY && conf.removeUnexpected) {
             delete dataTarget[endKey];
-          } else if (err.code === SchismaError.MISSING_KEY && schemaTarget[endKey].$required && !conf.ignoreRequired) {
-            dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey]);
+          } else if (err.code === SchismaError.MISSING_KEY && err.expected.$required && !conf.ignoreRequired) {
+            dataTarget[endKey] = err.expected.create(conf, dataTarget[endKey]);
           } else if (err.code === SchismaError.BAD_TYPE) {
             dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey]);
           } else if (err.code === SchismaError.BAD_LENGTH && (conf.shrinkArrays || conf.growArrays)) {

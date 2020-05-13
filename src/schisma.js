@@ -102,7 +102,7 @@ class Schisma {
     }
     // Check arrays.
     if (Array.isArray(o)) {
-      let newErrors = []
+      let typeErrors = []
       for (let $type of this.$typeof) {
         let matchErrors = []
         if (!Array.isArray($type)) {
@@ -134,17 +134,21 @@ class Schisma {
             }
           }
         }
-        if (matchErrors.length === 0) {
-          newErrors = []
-          break
-        } else {
-          newErrors = [...newErrors, ...matchErrors]
+        typeErrors.push(matchErrors)
+      }
+      // Get type with the least errors as target match.
+      let bestIndex = 0
+      for (let i = 0; i < typeErrors.length; i++) {
+        if (typeErrors[i].length < typeErrors[bestIndex].length) {
+          bestIndex = i
         }
       }
-      errors = [...errors, ...newErrors]
+      if (typeErrors.length > 0 && typeErrors[bestIndex].length > 0) {
+        errors = [...errors, ...typeErrors[bestIndex]]
+      }
     // Check objects.
     } else if (typeof o === 'object') {
-      let newErrors = []
+      let typeErrors = []
       for (let $type of this.$typeof) {
         let matchErrors = []
         if (!($type instanceof Object)) {
@@ -154,11 +158,11 @@ class Schisma {
           for (let k of new Set([...Object.keys($type), ...Object.keys(o)])) {
             if (!$type.hasOwnProperty(k)) {
               if (!conf.ignoreUnexpected) {
-                matchErrors.push(new SchismaError(SchismaError.UNEXPECTED_KEY, {message: `.${k} is unexpected`, value: o[k], where: `${dot}.${k}`}))
+                matchErrors.push(new SchismaError(SchismaError.UNEXPECTED_KEY, {message: `unexpected field`, value: o[k], where: `${dot}.${k}`}))
               }
             } else if (!o.hasOwnProperty(k)) {
               if ($type[k].$required && !conf.ignoreRequired) {
-                matchErrors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `.${k} is required`, expected: $type[k].$type, where: `${dot}.${k}`, received: 'undefined'}))
+                matchErrors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `field is required`, expected: $type[k].$type, where: `${dot}.${k}`, received: 'undefined'}))
               }
             } else {
               matchErrors = [...matchErrors, ...$type[k]._validate(o[k], conf, `${dot}.${k}`)]
@@ -167,16 +171,25 @@ class Schisma {
         }
         // We gucci
         if (matchErrors.length === 0) {
-          newErrors = []
+          typeErrors = [] // reset type errors
           break
         } else {
-          newErrors = [...newErrors, new SchismaError(SchismaError.BAD_TYPE, {
+          typeErrors.push(new SchismaError(SchismaError.BAD_TYPE, {
             message: `incorrect type`, where: dot, received: o,
             errors: matchErrors
-          })]
+          }))
         }
       }
-      errors = [...errors, ...newErrors]
+      // Add error if we actually did get a type error.
+      if (typeErrors.length > 0) {
+        let bestIndex = 0
+        for (let i = 0; i < typeErrors.length; i++) {
+          if (typeErrors[i].errors.length < typeErrors[bestIndex].errors.length) {
+            bestIndex = i
+          }
+        }
+        errors = [...errors, typeErrors[bestIndex]]
+      }
     // Check primitives.
     } else {
       if (!this.$typeof.find(type => typeof o === (type instanceof Schisma ? type.$type : type))) {
@@ -195,12 +208,12 @@ class Schisma {
    * @param {Object} [conf.matchArray="any"] Matches arrays by either "any" type contained or by a "pattern" of types.
    * @param {Object} [conf.growArrays=false] Grow arrays to match the length of the schema's array.
    * @param {Object} [conf.shrinkArrays=false] Shrink arrays to match the length of the schema's array.
-   * @param {Object} [conf.populateArrays=true] Populate empty arrays with default instances of their schema elements.
+   * @param {Object} [conf.populateArrays=false] Populate empty arrays with default instances of their schema elements.
    */
   conform(o, conf={}) {
-    conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', growArrays: false, shrinkArrays: false, populateArrays:true, flattenErrors: false}, ...conf}
+    conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', growArrays: false, shrinkArrays: false, populateArrays: false, flattenErrors: false}, ...conf}
     let validationErrors = this.validate(o, {...{
-      ignoreShortArrays: false, ignoreLongArrays: false
+      ignoreShortArrays: !conf.growArrays, ignoreLongArrays: !conf.shrinkArrays
     }, ...conf})
     this._conformFromErrors(o, validationErrors, conf)
     return o
@@ -236,11 +249,16 @@ class Schisma {
         )
         if (err.code === SchismaError.UNEXPECTED_KEY && conf.removeUnexpected) {
           delete dataTarget[endKey]
-        } else if (err.code === SchismaError.MISSING_KEY && err.expected.$required && !conf.ignoreRequired) {
-          dataTarget[endKey] = err.expected.create(conf, dataTarget[endKey])
+        } else if (err.code === SchismaError.MISSING_KEY) {
+          // This is kind of bad...
+          if (schemaTarget[endKey] && schemaTarget[endKey].$required && !conf.ignoreRequired) {
+            dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey])
+          } else if (err.expected.$required && !conf.ignoreRequired) {
+            dataTarget[endKey] = err.expected.create(conf, dataTarget[endKey])
+          }
         } else if (err.code === SchismaError.BAD_TYPE) {
           dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey])
-        } else if (err.code === SchismaError.BAD_LENGTH && (conf.shrinkArrays || conf.growArrays)) {
+        } else if (err.code === SchismaError.BAD_LENGTH) {
           let defaultArray = schemaTarget[endKey].create(conf, dataTarget[endKey])
           if (dataTarget[endKey].length > defaultArray.length && conf.shrinkArrays) {
             dataTarget[endKey] = [...dataTarget[endKey].slice(0, defaultArray.length)]

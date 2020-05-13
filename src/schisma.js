@@ -95,8 +95,12 @@ class Schisma {
     // Validate if user has provided such a function.
     if (this.$validate) {
       let validation_error = this.$validate(o, dot)
-      if (validation_error !== undefined) {
-        errors.push(new SchismaError(SchismaError.INVALID, {...{message: `failed validation`, value: o, where: dot}, ...validation_error}))
+      if (validation_error !== undefined && validation_error !== true) {
+        if (typeof validation_error === 'object') {
+          errors.push(new SchismaError(SchismaError.INVALID, {...{message: `failed validation`, value: o, where: dot}, ...validation_error}))
+        } else {
+          errors.push(new SchismaError(SchismaError.INVALID, {message: `failed validation`, value: o, where: dot}))
+        }
       }
       return errors
     }

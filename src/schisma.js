@@ -179,7 +179,9 @@ class Schisma {
               if (errors.length > 0) {
                 let bestIndex = 0
                 for (let i = 0; i < errors.length; i++) {
-                  if (errors[i].errors.length < errors[bestIndex].errors.length) {
+                  if (errors[i].errors === undefined) {
+                    bestIndex = i
+                  } else if (errors[i].errors.length < errors[bestIndex].errors.length) {
                     bestIndex = i
                   }
                 }

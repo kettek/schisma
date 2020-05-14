@@ -138,7 +138,12 @@ class Schisma {
             }
           }
         }
-        typeErrors.push(matchErrors)
+        if (matchErrors.length === 0) {
+          typeErrors = []
+          break
+        } else {
+          typeErrors.push(matchErrors)
+        }
       }
       // Get type with the least errors as target match.
       let bestIndex = 0
@@ -169,7 +174,17 @@ class Schisma {
                 matchErrors.push(new SchismaError(SchismaError.MISSING_KEY, {message: `field is required`, expected: $type[k].$type, where: `${dot}.${k}`, received: 'undefined'}))
               }
             } else {
-              matchErrors = [...matchErrors, ...$type[k]._validate(o[k], conf, `${dot}.${k}`)]
+              let errors = $type[k]._validate(o[k], conf, `${dot}.${k}`)
+              // Only return the error with least errors, I guess...? This should prevent multiple type mismatches against the same data for arrays of multiple types.
+              if (errors.length > 0) {
+                let bestIndex = 0
+                for (let i = 0; i < errors.length; i++) {
+                  if (errors[i].errors.length < errors[bestIndex].errors.length) {
+                    bestIndex = i
+                  }
+                }
+                matchErrors = [...matchErrors, errors[bestIndex]]
+              }
             }
           }
         }
@@ -179,7 +194,7 @@ class Schisma {
           break
         } else {
           typeErrors.push(new SchismaError(SchismaError.BAD_TYPE, {
-            message: `incorrect type`, where: dot, received: o,
+            message: `incorrect type`, where: dot, received: o, expected: $type,
             errors: matchErrors
           }))
         }
@@ -192,7 +207,9 @@ class Schisma {
             bestIndex = i
           }
         }
-        errors = [...errors, typeErrors[bestIndex]]
+        if (typeErrors[bestIndex].errors.length > 0) {
+          errors = [...errors, typeErrors[bestIndex]]
+        }
       }
     // Check primitives.
     } else {

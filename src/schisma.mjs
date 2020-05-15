@@ -1,4 +1,4 @@
-import SchismaError from './schisma_error.js'
+import SchismaError from './schisma_error.mjs'
 /**
  * Schisma represents a schema used to validate or conform an object structure.
  * It can also be used to create new objects that use the schema's defaults.
@@ -21,6 +21,11 @@ class Schisma {
       this.$type = o.map(v => new Schisma(v))
       this.$typeof = [this.$type]
       // TODO: we need some stringified $type that converts deep arrays/objects into full k=>v pairs, kinda like JSON.stringify, but for types only.
+    } else if (o === null) {
+      this.$type     = null
+      this.$typeof   = [null]
+      this.$ctor     = ()=>null
+      this.$default  = null
     } else if (typeof o === 'object') {
       if (o instanceof Schisma) {
         this.$type     = o.$type
@@ -31,9 +36,9 @@ class Schisma {
         this.$default  = o.$default
       } else if (o.hasOwnProperty('$typeof')) {
         let schs        = o.$typeof.map(t => new Schisma(t))
-        this.$type      = schs[0]
+        this.$type      = schs[0].$type
         this.$typeof    = schs.map(t => t.$type)
-        this.$ctor      = o.$typeof
+        this.$ctor      = schs[0].$ctor
         this.$validate  = o.$validate
         this.$required  = o.$required !== undefined ? o.$required : true
         this.$default   = o.$default
@@ -41,7 +46,7 @@ class Schisma {
         let sch         = new Schisma(o.$type)
         this.$type      = sch.$type
         this.$typeof    = [this.$type]
-        this.$ctor      = o.$type
+        this.$ctor      = sch.$ctor
         this.$validate  = o.$validate
         this.$required  = o.$required !== undefined ? o.$required : true
         this.$default   = o.$default !== undefined ? o.$default : sch.$default
@@ -155,6 +160,18 @@ class Schisma {
       if (typeErrors.length > 0 && typeErrors[bestIndex].length > 0) {
         errors = [...errors, ...typeErrors[bestIndex]]
       }
+    // Check null
+    } else if (o === null) {
+      let typeErrors = []
+      for (let $type of this.$typeof) {
+        if ($type === null) {
+          typeErrors = []
+          break
+        } else {
+          typeErrors.push(new SchismaError(SchismaError.BAD_TYPE, {message: `wrong object type`, expected: $type, received: o, value: o, where: dot}))
+        }
+      }
+      errors = [...errors, ...typeErrors]
     // Check objects.
     } else if (typeof o === 'object') {
       let typeErrors = []
@@ -282,11 +299,13 @@ class Schisma {
         } else if (err.code === SchismaError.BAD_TYPE) {
           dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey])
         } else if (err.code === SchismaError.BAD_LENGTH) {
-          let defaultArray = schemaTarget[endKey].create(conf, dataTarget[endKey])
-          if (dataTarget[endKey].length > defaultArray.length && conf.shrinkArrays) {
-            dataTarget[endKey] = [...dataTarget[endKey].slice(0, defaultArray.length)]
-          } else if (dataTarget[endKey].length < defaultArray.length && conf.growArrays) {
-            dataTarget[endKey] = [...dataTarget[endKey], ...defaultArray.slice(dataTarget[endKey].length, defaultArray.length)]
+          if (conf.shrinkArrays || conf.growArrays) {
+            let defaultArray = schemaTarget[endKey].create(conf, dataTarget[endKey])
+            if (dataTarget[endKey].length > defaultArray.length && conf.shrinkArrays) {
+              dataTarget[endKey] = [...dataTarget[endKey].slice(0, defaultArray.length)]
+            } else if (dataTarget[endKey].length < defaultArray.length && conf.growArrays) {
+              dataTarget[endKey] = [...dataTarget[endKey], ...defaultArray.slice(dataTarget[endKey].length, defaultArray.length)]
+            }
           }
         } else if (err.code === SchismaError.INVALID) {
           dataTarget[endKey] = schemaTarget[endKey].create(conf, dataTarget[endKey])
@@ -334,7 +353,13 @@ class Schisma {
         }
         return defaults
       } else {
-        return this.$ctor(data)
+        // FIXME: It would be better to handle this differently.
+        let value = this.$ctor(data)
+        if (typeof value === 'string' && data === null) {
+          return ''
+        } else {
+          return value
+        }
       }
     }
   }

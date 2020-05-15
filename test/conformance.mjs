@@ -32,3 +32,44 @@ test.failing('Number($type) conform', t => {
 
   t.is(conformed, 42)
 })
+
+test('conform complex $typeof',  t => {
+  let complexAa = schisma({
+    name: {
+      $type: String,
+      $default: 'Aa'
+    },
+    array: [],
+  })
+  let complexAb = schisma({
+    name: {
+      $type: String,
+      $default: 'Ab'
+    },
+    string: String
+  })
+
+  let complexA = schisma({
+    variableTypes: {
+      $typeof: [complexAa, complexAb],
+    }
+  })
+
+  let expectedA = {
+    variableTypes: {
+      name: 'Aa',
+      array: [],
+    }
+  }
+  let expectedB = {
+    variableTypes: {
+      name: 'Ab',
+      string: ''
+    }
+  }
+  let conformedA = complexA.conform(expectedA)
+  t.deepEqual(conformedA, expectedA)
+
+  let conformedB = complexA.conform(expectedB)
+  t.deepEqual(conformedB, expectedB)
+})

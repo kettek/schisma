@@ -249,42 +249,47 @@ class Schisma {
         }
         continue
       } else {
-        console.log('is primitive')
+        throw "unhandled (this shouldn't happen)"
       }
     }
     //
-    // get typeErrors with least errors children.
     return this._getBestResult(typesResults)
   }
   _getBestResult(results) {
-    let partialMatches = results.filter(t=>t.code === SchismaResult.PARTIAL_MATCH)
-    let exactMatches = results.filter(t=>t.code === SchismaResult.EXACT_MATCH)
-    let noMatches = results.filter(t=>t.code === SchismaResult.NO_MATCH)
-    if (exactMatches.length > 0) {
-      return exactMatches[0]
-    } else if (partialMatches.length > 0) {
-      // Get best partial match
-      let lastHueristics = -9999
-      let bestIndex = 0
-      for (let i = 0; i < partialMatches.length; i++) {
-        // TODO: Recursively get heuristics for entire results chain! And make partial matches worth more!
-        /*let hueristics = 0
-        partialMatches[i].results.forEach(r => {
-          this._getBestResult(partialMatches[i].results)
-        })
-        partialMatches[i].errors.forEach(r => {
-          this._getBestResult(partialMatches[i].errors)
-        })*/
-        let hueristics = partialMatches[i].results.length*2 - partialMatches[i].errors.length
-        if (hueristics > lastHueristics) {
-          bestIndex = i
+    let heuristics = results.map(r=>this._getHeuristics(r))
+    let bestValue = heuristics.reduce((iMax, x, i, arr) => x > arr[iMax] ? i : iMax, 0)
+    return results[bestValue]
+  }
+  _getHeuristics(results) {
+    let h = 0
+
+    if (results.code === SchismaResult.PARTIAL_MATCH) {
+      if (results.results) {
+        for (let r of results.results) {
+          h += this._getHeuristics(r)
         }
-        lastHueristics = hueristics
       }
-      return partialMatches[bestIndex]
-    } else if (noMatches.length > 0) {
-      return noMatches[0]
+      if (results.errors) {
+        for (let r of results.errors) {
+          h += this._getHeuristics(r)
+        }
+      }
+    } else if (results.code === SchismaResult.EXACT_MATCH) {
+      h += 1000
+      if (results.results) {
+        for (let r of results.results) {
+          h += this._getHeuristics(r)
+        }
+      }
+    } else if (results.code === SchismaResult.NO_MATCH) {
+      h -= 1000
+    } else if (results.isProblem()) {
+      h -= 1
+    } else {
+      h += 1
     }
+
+    return h
   }
   /**
    * Conforms the provided object to match the schema. Mis-matched types are

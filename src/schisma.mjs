@@ -233,10 +233,10 @@ class Schisma {
         }
         continue
       } else if (typeof type === 'function') {  // Primitive or Class
-        if (typeof o !== typeof type()) {
+        if (typeof o !== typeof this.create()) {
           typesResults.push(new SchismaResult(SchismaResult.NO_MATCH, {
             where: `${dot}`,
-            expected: typeof type(),
+            expected: type,
             received: typeof o,
             __typeIndex: typeIndex,
             value: o,
@@ -321,7 +321,11 @@ class Schisma {
         } else if (err.code === SchismaResult.NO_MATCH) {
           let targetSchema = this.$typeof[err.__typeIndex]
           if (typeof targetSchema === 'function') { // Primitive or base class
-            data = targetSchema(data)
+            try {
+              data = targetSchema(data)
+            } catch(e) {
+              data = new targetSchema(data)
+            }
           } else {
             data = targetSchema.create(conf, data)
           }
@@ -338,7 +342,11 @@ class Schisma {
         } else if (err.code === SchismaResult.NO_MATCH) {
           let targetSchema = this.$typeof[err.__typeIndex][err.where]
           if (typeof targetSchema === 'function') { // Primitive or base class
-            data[err.where] = targetSchema(data)
+            try {
+              data[err.where] = targetSchema(data[err.where])
+            } catch(e) {
+              data[err.where] = new targetSchema(data[err.where])
+            }
           } else {
             data[err.where] = targetSchema.create(conf, data[err.where])
           }
@@ -399,7 +407,15 @@ class Schisma {
           return type(false)
         }
       }
-      return type(data)
+      if (type === String || type === Number || type === Boolean) {
+        return type(data)
+      }
+      try {
+        data = type(data)
+      } catch(e) {
+        data = new type(data)
+      }
+      return data
     }
     return 'FIXME'
   }

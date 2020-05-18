@@ -34,29 +34,11 @@ class SchismaResult {
   static get NO_MATCH() {
     return 'no match'
   }
-  static get GOOD_TYPE() {
-    return 'good type'
-  }
-  static get EXPECTED_KEY() {
-    return 'expected key'
-  }
-  static get GOOD_LENGTH() {
-    return 'good length'
-  }
-  static get BAD_TYPE() {
-    return 'bad type'
-  }
   static get UNEXPECTED_KEY() {
     return 'unexpected key'
   }
   static get MISSING_KEY() {
     return 'missing key'
-  }
-  static get BAD_KEY() {
-    return 'bad key'
-  }
-  static get BAD_LENGTH() {
-    return 'bad length'
   }
   static get INVALID() {
     return 'invalid'

@@ -39,6 +39,9 @@ class Schisma {
         if (o.$validate !== undefined) {
           this.$validate = o.$validate
         }
+        if (o.$unmarshal !== undefined) {
+          this.$unmarshal = o.$unmarshal
+        }
         this.__type = 'SchismaObject'
       } else {
         this.$typeof[0] = {}
@@ -79,13 +82,17 @@ class Schisma {
    * @param {Object} [conf.ignoreLongArrays=true] Ignores arrays that are longer than the schema's array.
    * @param {Object} [conf.matchArray="any"] Matches array by either "any" type contained or by a "pattern" of types.
    * @param {Object} [conf.flattenErrors=true] Flattens errors into a single array.
+   * @param {Object} [conf.filterNonErrors=true] Filters out non error results.
    * @returns {{code: Number, value: Any, where: String, message: String, expected: String, received: String}[]} Array of errors
    */
   validate(o, conf={}, dot='') {
-    conf = {...{ignoreUnexpected:false,ignoreRequired:false,ignoreShortArrays:true,ignoreLongArrays:true,matchArray:"any",flattenErrors:true}, ...conf}
+    conf = {...{ignoreUnexpected:false,ignoreRequired:false,ignoreShortArrays:true,ignoreLongArrays:true,matchArray:"any",flattenErrors:true, filterNonErrors: true, }, ...conf}
 
     let results = this._validate(o, conf, dot)
-    let errors = results.errors ? results.errors.filter(r=>r.isProblem()) : results.isProblem() ? [results] : [] // [results] is because of $validate
+    let errors = results.errors ? results.errors : [results] // $validate requires [results]
+    if (conf.filterNonErrors) {
+      errors = errors.filter(r => r.isProblem())
+    }
     if (conf.flattenErrors) {
       let toReturn = []
       let addChildren=err => {
@@ -107,6 +114,9 @@ class Schisma {
     return errors
   }
   _validate(o,conf={},dot='') {
+    if (this.$unmarshal !== undefined) {
+      o = this.$unmarshal(o)
+    }
     if (this.$validate !== undefined) {
       let result = this.$validate(o, dot)
       if (result !== undefined && result !== true) {
@@ -233,7 +243,7 @@ class Schisma {
         }
         continue
       } else if (typeof type === 'function') {  // Primitive or Class
-        if (typeof o !== typeof this.create()) {
+        if (typeof o !== typeof this.create() && !(o instanceof type)) {
           typesResults.push(new SchismaResult(SchismaResult.NO_MATCH, {
             where: `${dot}`,
             expected: type,
@@ -306,12 +316,15 @@ class Schisma {
   conform(o, conf={}) {
     conf = {...{removeUnexpected:true, insertMissing:true, matchArray:'any', growArrays: false, shrinkArrays: false, populateArrays: false, flattenErrors: false}, ...conf}
     let results = this.validate(o, {...{
-      ignoreShortArrays: !conf.growArrays, ignoreLongArrays: !conf.shrinkArrays
+      ignoreShortArrays: !conf.growArrays, ignoreLongArrays: !conf.shrinkArrays, filterNonErrors: false,
     }, ...conf})
     o = this._conformFromErrors(o, results, conf)
     return o
   }
   _conformFromErrors(data, errs, conf, fixedDotPaths=new Set()) {
+    if (this.$unmarshal) {
+      data = this.$unmarshal(data)
+    }
     for (let err of errs) {
       // Welcome to the Dept. of Redundancy.
       if (err.where === '') {
@@ -380,6 +393,9 @@ class Schisma {
     conf = {...{populateArrays:false},...conf}
     if (this.$default !== undefined) {
       return this.$default instanceof Function ? this.$default(data) : Schisma._deepClone(this.$default)
+    }
+    if (this.$unmarshal !== undefined) {
+      return this.$unmarshal(data)
     }
     let type = this.$typeof[0]
 

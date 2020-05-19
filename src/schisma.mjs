@@ -167,7 +167,7 @@ class Schisma {
           }
           let checkResults = []
           for (let arrayTypeIndex = 0; arrayTypeIndex < type.length; arrayTypeIndex++) {
-            checkResults.push(type[arrayTypeIndex]._validate(o[index], conf, `${index}`))
+            checkResults.push(type[arrayTypeIndex]._validate(o[index], conf, index))
             checkResults.__typeIndex = arrayTypeIndex
           }
           let bestResult = this._getBestResult(checkResults)

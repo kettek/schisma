@@ -98,7 +98,7 @@ class Schisma {
       let addChildren=err => {
         if (err.errors) {
           let nextErrors = err.errors
-          err.errors.forEach(e=>e.where=`.${err.where}.${e.where}`)
+          err.errors.forEach(e=>e.where=`${err.where}.${e.where}`)
           delete err.errors
           //delete err.results
           toReturn.push(err)

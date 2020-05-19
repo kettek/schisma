@@ -54,7 +54,7 @@ class Schisma {
       this.$typeof  = [o]
       this.__type   = 'Class'
     } else {
-      // Decompose primitives as type an defaults.
+      // Decompose primitives as type and default.
       switch(typeof o) {
         case 'number':
           this.$default = o
@@ -384,9 +384,9 @@ class Schisma {
    * key, then whatever that key represents will be created with the
    * type's default constructor.
    *
-   * @param {*} [data] Original data that is used for primitive constructors. This allows types to be interpreted as one another when possible.
    * @param {Object} [conf] Configuration for fine-tuning creation.
    * @param {Object} [conf.populateArrays=false] Whether or not arrays should be populated with default instances of their elements.
+   * @param {*} [data] Original data that is used for primitive constructors. This allows types to be interpreted as one another when possible.
    * @returns {Object} object conforming to the schema's definition.
    */
   create(conf={}, data) {
@@ -435,6 +435,49 @@ class Schisma {
     }
     return 'FIXME'
   }
+  /**
+   * Creates a new target property of the schema. This corresponds to the
+   * schema structure.
+   * 
+   * @example
+   *     let sch = schisma({a: { B: 0 }})
+   *     sch.createProperty('a') // => { B: 0 }
+   *     sch.createProperty('a.B') // => 0
+   * @example
+   *     let sch = schisma({ variadic: { $typeof: [String, Number] } })
+   *     sch.createProperty('variadic.$0') // => ''
+   *     sch.createProperty('variadic.$1') // => 0
+   * @example
+   *     let sch = schisma({a: { string: String }})
+   *     sch.createProperty('a.string', {}, 'test') // => 'test'
+   * @param {String} which Which property to create. Follows dot-syntax.
+   * @param {Object} conf see create().
+   * @param {*} data data with which to pass to the target's constructor.
+   * @returns {Object} object conforming to the schema's definition.
+   */
+  createProperty(which='', conf={}, data) {
+    if (which === '') {
+      return this.create(conf, data)
+    }
+    let key, nextWhich, targetSchema
+
+    [key, nextWhich] = which.split(/\.(.+)/)
+
+    if (key[0] === '$') {
+      targetSchema = this.$typeof[Number(key.substring(1))]
+    } else {
+      targetSchema = this.$typeof[0]
+      if (targetSchema) {
+        targetSchema = targetSchema[key]
+      }
+    }
+    if (!targetSchema) {
+      // throw...?
+      return undefined
+    }
+    return targetSchema.createProperty(nextWhich, conf, data)
+  }
+
   /**
    * Deep copies a value.
    */

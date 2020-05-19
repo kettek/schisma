@@ -17,7 +17,7 @@ test('Object conform',  t => {
 
 // Conforming stand-alone primitive schemas is broken. If these are contained in another schema, they conform fine.
 let numberSchema = schisma(Number)
-test.failing('Number conform', t => {
+test('Number conform', t => {
   let conformed = numberSchema.conform('42')
 
   t.is(conformed, 42)
@@ -27,7 +27,7 @@ test.failing('Number conform', t => {
 let numberTypeSchema = schisma({
   $type: Number
 })
-test.failing('Number($type) conform', t => {
+test('Number($type) conform', t => {
   let conformed = numberTypeSchema.conform('42')
 
   t.is(conformed, 42)

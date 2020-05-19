@@ -64,7 +64,7 @@ Objects can be used to compose more complex schemas. The key-value pairs can use
 }
 ```
 
-##### Shisma-style Object
+##### Schisma-style Object
 A Schisma-style object can also be used.
 
 ```
@@ -170,65 +170,27 @@ let myPersonhood = {
 mySchema.validate(myPersonhood)
 /* Returns:
 [
-  SchismaError {
-    code: 1,
-    where: '',
-    message: 'incorrect type',
-    received: { name: 'OXXO', height: 180, owns: [Object] }
-  },
-  SchismaError {
-    code: 3,
-    where: '.age',
-    message: '.age is required',
-    expected: 'number',
-    received: 'undefined'
-  },
-  SchismaError {
-    code: 1,
-    where: '.owns',
-    message: 'incorrect type',
-    received: { cats: [Array] }
-  },
-  SchismaError {
-    code: 3,
-    where: '.owns.apples',
-    message: '.apples is required',
-    expected: 'number',
-    received: 'undefined'
-  },
-  SchismaError {
-    code: 1,
-    where: '.owns.cats.0',
-    message: 'incorrect type',
-    received: { hairless: true, age: 400 }
-  },
-  SchismaError {
-    code: 5,
-    value: 400,
-    where: '.owns.cats.0.age',
-    message: 'failed validation',
-    expected: '<=38',
-    received: 400
-  },
-  SchismaError {
-    code: 1,
-    where: '.owns.cats.2',
-    message: 'incorrect type',
-    received: { hairless: 'maybe', age: 20 }
-  },
-  SchismaError {
-    code: 1,
+  SchismaResult { code: 'missing key', where: 'age' },
+  SchismaResult { code: 'missing key', where: 'owns.apples' },
+  SchismaResult {
+    code: 'no match',
+    where: 'owns.cats.2.hairless',
+    expected: [Function: Boolean],
+    received: 'string',
     value: 'maybe',
-    where: '.owns.cats.2.hairless',
-    message: 'wrong type',
-    expected: [ 'boolean' ],
-    received: 'string'
+    __typeIndex: 0
   },
-  SchismaError {
-    code: 2,
-    value: 180,
-    where: '.height',
-    message: '.height is unexpected'
+  SchismaResult {
+    code: 'invalid',
+    where: 'owns.cats.0.age',
+    expected: '<=38',
+    received: 400,
+    value: 400
+  },
+  SchismaResult {
+    code: 'unexpected key',
+    where: 'height',
+    received: 180
   }
 ]
 */
@@ -242,53 +204,28 @@ Options can also be passed to validate.
 | **ignoreRequired**    | `Boolean` | *false* | Ignores required object keys.
 | **ignoreShortArrays** | `Boolean` | *true* | Ignores arrays that are shorter than the schema's array.
 | **ignoreLongArrays** | `Boolean` | *true* | Ignores arrays that are longer than the schema's array.
-| **matchArray**       | `String`  | *"any"* | Matches array elements against either "any" type contained or by a "pattern" of types.
 | **flattenErrors**    | `Boolean` | *true*  | Flattens all errors to return as a single array rather than heirarchically.
+| **filterNonErrors**  | `Boolean` | *true*  | Filters out non error results.
 
 
 ```
 mySchema.validate(myPersonhood, {ignoreUnexpected: true, ignoreRequired: true})
 /* Returns:
 [
-  SchismaError {
-    code: 1,
-    where: '',
-    message: 'incorrect type',
-    received: { name: 'OXXO', height: 180, owns: [Object] }
-  },
-  SchismaError {
-    code: 1,
-    where: '.owns',
-    message: 'incorrect type',
-    received: { cats: [Array] }
-  },
-  SchismaError {
-    code: 1,
-    where: '.owns.cats.0',
-    message: 'incorrect type',
-    received: { hairless: true, age: 400 }
-  },
-  SchismaError {
-    code: 5,
-    value: 400,
-    where: '.owns.cats.0.age',
-    message: 'failed validation',
-    expected: '<=38',
-    received: 400
-  },
-  SchismaError {
-    code: 1,
-    where: '.owns.cats.2',
-    message: 'incorrect type',
-    received: { hairless: 'maybe', age: 20 }
-  },
-  SchismaError {
-    code: 1,
+  SchismaResult {
+    code: 'no match',
+    where: 'owns.cats.2.hairless',
+    expected: [Function: Boolean],
+    received: 'string',
     value: 'maybe',
-    where: '.owns.cats.2.hairless',
-    message: 'wrong type',
-    expected: [ 'boolean' ],
-    received: 'string'
+    __typeIndex: 0
+  },
+  SchismaResult {
+    code: 'invalid',
+    where: 'owns.cats.0.age',
+    expected: '<=38',
+    received: 400,
+    value: 400
   }
 ]
 */
@@ -317,7 +254,6 @@ Just like validate, conform can also take options to adjust the output.
 |-|-|-|-|
 | **removeUnexpected** | `Boolean` | *true*  | Removes unexpected object keys.
 | **insertMissing**    | `Boolean` | *true*  | Inserts missing object keys with default values.
-| **matchArray**       | `String`  | *"any"* | Matches arrays by either "any" type contained or by a "pattern" of types.
 | **growArrays**       | `Boolean` | *false* | Grow arrays to match the length of the schema's array.
 | **shrinkArrays**     | `Boolean` | *false* | Shrink arrays to match the length of the schema's array.
 | **populateArrays**   | `Boolean` | *false*  | Populate empty arrays with default instances of their schema elements.

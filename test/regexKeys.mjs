@@ -32,3 +32,17 @@ test('Regex Matching (fails)', t => {
   }
   t.pass()
 })
+
+test('Regex Matching create', t => {
+  let sch = schisma({
+    "$/.*": [String],
+    "$/yeet": [Boolean],
+    dab: "hit it",
+  })
+
+  if (t.deepEqual({dab: "hit it"}, sch.create()) === undefined) {
+    t.pass()
+    return
+  }
+  t.fail("created object was not empty")
+})

@@ -462,6 +462,7 @@ class Schisma {
     } else if (typeof type === 'object') {
       let o = {}
       for (let [k, v] of Object.entries(type)) {
+        if (k.startsWith('$/')) continue
         o[k] = v.create(conf)
       }
       return o

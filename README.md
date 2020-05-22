@@ -64,6 +64,35 @@ Objects can be used to compose more complex schemas. The key-value pairs can use
 }
 ```
 
+###### Regular expression key matching
+Regular expressions can also be used via the special `$/` key prefix. These allow schemas to receive arbitrary keys that map to concrete types. The value of these regex keys **must** always be an array of desired types.
+
+```
+{
+  "$/.*": [Number],
+}
+```
+
+Multiple regular expressions can be used. Matching attempts will be done in order of declaration.
+
+```
+{
+  "$/*": [Number],
+  "$/(.*)key": [String],
+}
+```
+
+Regular keys may be mixed freely and take priority over regex matching.
+
+```
+{
+  "$/*": [Number],
+  "$/(.*)key": [String],
+  myProperty: Boolean,
+}
+```
+
+
 ##### Schisma-style Object
 A Schisma-style object can also be used.
 

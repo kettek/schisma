@@ -46,7 +46,12 @@ class Schisma {
       } else {
         this.$typeof[0] = {}
         for (let key of Object.keys(o)) {
-          this.$typeof[0][key] = new Schisma(o[key])
+          // Convert searchable keys to Schisma objects.
+          if (key.startsWith('$/')) {
+            this.$typeof[0][key] = o[key].map(t=>new Schisma(t))
+          } else {
+            this.$typeof[0][key] = new Schisma(o[key])
+          }
         }
         this.__type = 'Object'
       }
@@ -203,8 +208,55 @@ class Schisma {
           }))
           continue
         }
-        let sharedKeys = new Set([...Object.keys(type), ...Object.keys(o)])
+        //
         let matchResults = [], matchErrors = []
+        // Collect our yet-to-be-checked object keys.
+        let pendingObjectKeys = Object.keys(o)
+        let pendingObjectKeyResults = {}
+        // Iterate through all type keys that are search indicated.
+        let searchKeys = Object.keys(type).filter(k => k.startsWith('$/'))
+        for (let searchKey of searchKeys) {
+          let search = new RegExp(searchKey.slice(2))
+          // Iterate through object keys to see if it matches.
+          for (let objKey of pendingObjectKeys) {
+            // Only do a match check if the key is undefined on the type AND matches the search.
+            if (type[objKey] === undefined) {
+              if (search.test(objKey)) {
+                let checkResults = []
+                for (let valueType of type[searchKey]) {
+                  checkResults.push(valueType._validate(o[objKey], conf, `${objKey}`))
+                }
+                let bestResult = this._getBestResult(checkResults)
+                if (!pendingObjectKeyResults[objKey]) {
+                  pendingObjectKeyResults[objKey] = {
+                    results: [],
+                    errors: [],
+                  }
+                }
+                if (bestResult.isProblem()) {
+                  pendingObjectKeyResults[objKey].errors.push(bestResult)
+                } else {
+                  pendingObjectKeyResults[objKey].results.push(bestResult)
+                }
+                // Remove from pending object keys, as we have a match.
+                //pendingObjectKeys.splice(pendingObjectKeys.indexOf(objKey), 1)
+              }
+            }
+          }
+        }
+
+        // Filter out key matches from key check and add relevant errors and results.
+        for (let key in pendingObjectKeyResults) {
+          if (pendingObjectKeyResults[key].results.length > 0) {
+            matchResults.push(this._getBestResult(pendingObjectKeyResults[key].results))
+          } else if (pendingObjectKeyResults[key].errors.length > 0) {
+            matchErrors.push(this._getBestResult(pendingObjectKeyResults[key].errors))
+          }
+          pendingObjectKeys.splice(pendingObjectKeys.indexOf(key), 1)
+        }
+
+        // Iterate through all shared keys that are not part of any key matching tests.
+        let sharedKeys = new Set([...Object.keys(type).filter(k=>!searchKeys.includes(k)), ...pendingObjectKeys])
         for (let key of sharedKeys) {
           if (type[key] === undefined) {
             if (conf.ignoreUnexpected) continue

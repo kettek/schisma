@@ -557,6 +557,7 @@ class Schisma {
 function schisma(newSchema) {
   return new Schisma(newSchema)
 }
+schisma.Schisma = Schisma
 schisma.SchismaResult = SchismaResult
 
 export default schisma

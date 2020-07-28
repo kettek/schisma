@@ -125,7 +125,16 @@ class Schisma {
     if (this.$validate !== undefined) {
       let result = this.$validate(o, dot)
       if (result !== undefined && result !== true) {
-        if (typeof result === 'object') {
+        if (Array.isArray(result)) {
+          let errors = result.filter(r=>r instanceof SchismaResult&&r.isProblem())
+          let results = result.filter(r=>r instanceof SchismaResult&&!r.isProblem())
+          if (errors.length === 0 && results.length === 0) {
+            errors = result
+          }
+          return new SchismaResult(errors.length>0?SchismaResult.INVALID:SchismaResult.VALID, {
+            value: o, where: dot, errors: errors, results: results,
+          })
+        } else if (typeof result === 'object') {
           return new SchismaResult(SchismaResult.INVALID, {
             ...{value: o, where: dot},
             ...result

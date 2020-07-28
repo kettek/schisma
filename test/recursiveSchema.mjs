@@ -2,18 +2,13 @@ import test from 'ava'
 import schisma from '../src/schisma.mjs'
 import SchismaResult from '../src/schisma_result.mjs'
 
-test('recursive schema', t => {
+test.only('recursive schema', t => {
   let sch = schisma({
     name: String,
     children: {
       $required: false,
       $type: [{
-        $validate: d => {
-          let errs = sch.validate(d)
-          if (errs.length > 0) {
-            return {errors: errs}
-          }
-        },
+        $validate: d => sch.validate(d)
       }]
     }
   })
@@ -26,7 +21,7 @@ test('recursive schema', t => {
         children: [
           {
             name: "Grandchild",
-          }
+          },
         ]
       },
     ]

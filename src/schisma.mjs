@@ -24,7 +24,7 @@ class Schisma {
       this.$typeof    = [o.map(t=>new Schisma(t))]
       this.__type     = 'Array'
     } else if (typeof o === 'object') {
-      if (o.$typeof !== undefined || o.$type !== undefined) {
+      if (o.$typeof !== undefined || o.$type !== undefined || o.$validate !== undefined) {
         if (o.$typeof !== undefined) {
           this.$typeof = o.$typeof.map(t=>new Schisma(t))
         } else if (o.$type !== undefined) {

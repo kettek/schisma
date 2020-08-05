@@ -5,7 +5,7 @@
   "main": "dist/schisma.js",
   "scripts": {
     "test": "ava",
-    "build": "rollup src/schisma.mjs --file dist/schisma.js --format umd --name schisma"
+    "build": "rollup src/schisma.mjs --file dist/schisma.js --format umd -p terser --name schisma"
   },
   "repository": {
     "type": "git",
@@ -22,7 +22,8 @@
   "license": "MPL-2.0",
   "devDependencies": {
     "ava": "^3.8.2",
-    "rollup": "^1.20.3"
+    "rollup": "^2.23.0",
+    "rollup-plugin-terser": "^6.1.0"
   },
   "ava": {
     "nodeArguments": [

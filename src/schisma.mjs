@@ -147,6 +147,10 @@ class Schisma {
             ...{value: o, where: dot},
             ...result
           })
+        } else if (typeof result === 'string') {
+          return new SchismaResult(SchismaResult.INVALID, {
+            value: o, where: dot, message: result
+          })
         } else {
           return new SchismaResult(SchismaResult.INVALID, {
             value: o, where: dot

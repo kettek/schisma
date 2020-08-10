@@ -116,10 +116,10 @@ Unlike the other value declarations, schisma-style objects are how you can provi
   * **$typeof** [*<Any>*] - An array of any of the types allowed within `$type`. This limits the given field/object's type to be one of the provided types. If `$type` and `$typeof` are used in the same declaration, `$type` will be ignored.
   * **[$default]** *<Any|Function>* - The default value to use when inserting a value or generating a default object. If it is a function, then the return value of said function is used.
   * **[$required]** *<Boolean>* - Whether the value should be considered as required for validation and conforming. *Defaults to true*
-  * **[$validate]** *<Function(value,where)>* - The function used to validate the value. May return an object that is merged with the resulting SchismaError with any of the following fields:
+  * **[$validate]** *<Function(value,where)>* - The function used to validate the value. May return an object that is merged with the resulting SchismaError with any of the following fields. Additionally, if a plain string is returned, it is used as the *message* field.
     * **[value]** - The value of the entry. *Defaults to the object's original value*
     * **[where]** - Where in the tree the error occurred. *Defaults to the full object path*
-    * **[message]** - Message of the error. *Defaults to 'failed validation'*
+    * **[message]** - Message of the error.
     * **[expected]** - Type expected to be seen.
     * **[received]** - Received type instead of the expected type.
 ```

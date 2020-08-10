@@ -20,6 +20,7 @@ class SchismaResult {
     if (extra.__typeIndex !== undefined) this.__typeIndex = extra.__typeIndex
     if (extra.errors) this.errors = extra.errors
     if (extra.results) this.results = extra.results
+    if (extra.message) this.message = extra.message
   }
   isProblem() {
     if ([SchismaResult.PARTIAL_MATCH, SchismaResult.NO_MATCH].includes(this.code)) {

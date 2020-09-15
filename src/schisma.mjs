@@ -73,6 +73,10 @@ class Schisma {
           this.$default = o
           this.$typeof  = [Number]
         break;
+        case 'bigint':
+          this.$default = o
+          this.$typeof  = [BigInt]
+        break;
         case 'string':
           this.$default = o
           this.$typeof  = [String]
@@ -537,7 +541,7 @@ class Schisma {
       if (data === undefined) {
         if (type === String) {
           return type('')
-        } else if (type === Number) {
+        } else if (type === Number || (BigInt !== undefined && type === BigInt)) {
           return type(0)
         } else if (type === Boolean) {
           return type(false)
@@ -546,6 +550,12 @@ class Schisma {
       if (type === Number) {
         data = type(data)
         if (isNaN(data)) {
+          return this.create(conf)
+        }
+        return data
+      } else if (BigInt !== undefined && type === BigInt) {
+        data = type(data)
+        if (isNaN(Number(data))) {
           return this.create(conf)
         }
         return data

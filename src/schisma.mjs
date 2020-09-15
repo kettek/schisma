@@ -543,7 +543,19 @@ class Schisma {
           return type(false)
         }
       }
-      if (type === String || type === Number || type === Boolean) {
+      if (type === Number) {
+        data = type(data)
+        if (isNaN(data)) {
+          return this.create(conf)
+        }
+        return data
+      } else if (type === String) {
+        if (typeof data === 'object') {
+          // Stringify the object, I suppose
+          return type(JSON.stringify(data))
+        }
+        return type(data)
+      } else if (type === Boolean) {
         return type(data)
       }
       try {

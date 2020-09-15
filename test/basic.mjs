@@ -18,3 +18,9 @@ test('Object of String',  t => t.deepEqual({a: ''}, schisma({a: String}).create(
 test('Object of Boolean', t => t.deepEqual({a: false}, schisma({a: Boolean}).create()))
 test('Object of Object',  t => t.deepEqual({a: {}}, schisma({a: {}}).create()))
 test('Object of Array',   t => t.deepEqual({a: []}, schisma({a: []}).create()))
+
+test('Number type mismatch conform',  t => t.deepEqual(32, schisma(Number).conform('32')))
+test('String type mismatch conform',  t => t.deepEqual('0', schisma(String).conform(0)))
+test('Boolean type mismatch conform', t => t.deepEqual(true, schisma(Boolean).conform(1)))
+test('Object type mismatch conform',  t => t.deepEqual({}, schisma({}).conform(0)))
+test('Array type mismatch conform',   t => t.deepEqual([], schisma([]).conform(0)))

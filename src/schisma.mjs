@@ -412,8 +412,28 @@ class Schisma {
             } catch(e) {
               data = new targetSchema(data)
             }
-          } else {
-            data = targetSchema.create(conf, data)
+          } else if (Array.isArray(targetSchema)) {
+            data = []
+            if (conf.populateArrays === true) {
+              if (conf.matchArray === 'pattern') {
+                for (let e of targetSchema) {
+                  data.push(e.create(conf))
+                }
+              } else if (conf.matchArray === 'any') {
+                data.push(targetSchema[0].create(conf))
+              }
+            }
+          } else if (typeof targetSchema === 'object') {
+            // Handle Schisma instances or plain objects
+            if (targetSchema instanceof Schisma) {
+              data = targetSchema.create(conf, data)
+            } else {
+              let ndata = {}
+              for (let key of Object.keys(targetSchema)) {
+                ndata[key] = targetSchema[key].create(conf, data[key])
+              }
+              data = ndata
+            }
           }
         } else if (err.code === SchismaResult.UNEXPECTED_KEY) {
           return undefined
@@ -433,8 +453,28 @@ class Schisma {
             } catch(e) {
               data[err.where] = new targetSchema(data[err.where])
             }
-          } else {
-            data[err.where] = targetSchema.create(conf, data[err.where])
+          } else if (Array.isArray(targetSchema)) {
+            data[err.where] = []
+            if (conf.populateArrays === true) {
+              if (conf.matchArray === 'pattern') {
+                for (let e of targetSchema) {
+                  data[err.where].push(e.create(conf))
+                }
+              } else if (conf.matchArray === 'any') {
+                data[err.where].push(targetSchema[0].create(conf))
+              }
+            }
+          } else if (typeof targetSchema === 'object') {
+            // Handle Schisma instances or plain objects
+            if (targetSchema instanceof Schisma) {
+              data[err.where] = targetSchema.create(conf, data[err.where])
+            } else {
+              let ndata = {}
+              for (let key of Object.keys(targetSchema)) {
+                ndata[key] = targetSchema[key].create(conf, data[err.where][key])
+              }
+              data[err.where] = ndata
+            }
           }
         } else if (err.code === SchismaResult.UNEXPECTED_KEY) {
           // Where can be a number or a string depending on array or object.

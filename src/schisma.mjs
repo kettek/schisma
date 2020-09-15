@@ -505,7 +505,12 @@ class Schisma {
   create(conf={}, data) {
     conf = {...{populateArrays:false},...conf}
     if (this.$default !== undefined) {
-      return this.$default instanceof Function ? this.$default(data) : Schisma._deepClone(this.$default)
+      if (this.$default instanceof Function) {
+        return this.$default(data)
+      }
+      if (data === undefined) {
+        return Schisma._deepClone(this.$default)
+      }
     }
     if (this.$unmarshal !== undefined) {
       return this.$unmarshal(data)

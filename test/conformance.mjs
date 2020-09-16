@@ -12,7 +12,7 @@ test('Object conform',  t => {
     string: 11,
   })
 
-  t.deepEqual(conformed, {number: 32, string: '11'})
+  t.deepEqual({number: 32, string: '11'}, conformed)
 })
 
 // Conforming stand-alone primitive schemas is broken. If these are contained in another schema, they conform fine.

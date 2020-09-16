@@ -2,7 +2,7 @@ import test from 'ava'
 import schisma from '../src/schisma.mjs'
 import SchismaResult from '../src/schisma_result.mjs'
 
-test.only('recursive schema', t => {
+test('recursive schema', t => {
   let sch = schisma({
     name: String,
     children: {

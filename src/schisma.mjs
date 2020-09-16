@@ -177,7 +177,7 @@ class Schisma {
       } else if (Array.isArray(type)) {         // Array of Schisma
         if (!Array.isArray(o)) {
           typesResults.push(new SchismaResult(SchismaResult.NO_MATCH, {
-            where: `${dot}`,
+            where: dot,
             expected: 'array',
             received: typeof o,
             value: o,
@@ -211,12 +211,13 @@ class Schisma {
         if (o.length < type.length && !conf.ignoreShortArrays) {
           for (let i = o.length; i < type.length; i++) {
             matchErrors.push(new SchismaResult(SchismaResult.MISSING_KEY, {
-              where: i
+              where: i,
+              __typeIndex: i,
             }))
           }
         }
         typesResults.push(new SchismaResult(matchErrors.length > 0 ? SchismaResult.PARTIAL_MATCH : SchismaResult.EXACT_MATCH, {
-          where: `${dot}`,
+          where: dot,
           errors: matchErrors,
           results: matchResults,
           __typeIndex: typeIndex,
@@ -225,7 +226,7 @@ class Schisma {
       } else if (typeof type === 'object') {    // key=>value object
         if (typeof o !== 'object') {
           typesResults.push(new SchismaResult(SchismaResult.NO_MATCH, {
-            where: `${dot}`,
+            where: dot,
             expected: 'object',
             received: typeof o,
             value: o,
@@ -286,13 +287,13 @@ class Schisma {
           if (type[key] === undefined) {
             if (conf.ignoreUnexpected) continue
             matchErrors.push(new SchismaResult(SchismaResult.UNEXPECTED_KEY, {
-              where: `${key}`,
+              where: key,
               received: o[key],
             }))
           } else if (o[key] === undefined) {
             if (!type[key].$required || conf.ignoreRequired) continue
             matchErrors.push(new SchismaResult(SchismaResult.MISSING_KEY, {
-              where: `${key}`,
+              where: key,
             }))
           } else {
             let checkResults = type[key]._validate(o[key], conf, `${key}`)
@@ -305,14 +306,14 @@ class Schisma {
         }
         if (matchErrors.length > 0) {
           typesResults.push(new SchismaResult(SchismaResult.PARTIAL_MATCH, {
-            where: `${dot}`,
+            where: dot,
             errors: matchErrors,
             results: matchResults,
             __typeIndex: typeIndex,
           }))
         } else {
           typesResults.push(new SchismaResult(SchismaResult.EXACT_MATCH, {
-            where: `${dot}`,
+            where: dot,
             errors: matchErrors,
             results: matchResults,
             __typeIndex: typeIndex,
@@ -322,7 +323,7 @@ class Schisma {
       } else if (typeof type === 'function') {  // Primitive or Class
         if (typeof o !== typeof this.create() && !(o instanceof type)) {
           typesResults.push(new SchismaResult(SchismaResult.NO_MATCH, {
-            where: `${dot}`,
+            where: dot,
             expected: type,
             received: typeof o,
             __typeIndex: typeIndex,
@@ -330,7 +331,7 @@ class Schisma {
           }))
         } else {
           typesResults.push(new SchismaResult(SchismaResult.EXACT_MATCH, {
-            where: `${dot}`,
+            where: dot,
             __typeIndex: typeIndex,
           }))
         }
@@ -403,101 +404,103 @@ class Schisma {
       data = this.$unmarshal(data)
     }
     for (let err of errs) {
-      // Welcome to the Dept. of Redundancy.
-      if (err.where === '') {
-        if (err.code === SchismaResult.PARTIAL_MATCH) {
-          let targetSchema = this.$typeof[0]
-          data = targetSchema.$typeof[err.__typeIndex]._conformFromErrors(data, err.errors, conf, fixedDotPaths)
-        } else if (err.code === SchismaResult.NO_MATCH) {
-          let targetSchema = this.$typeof[err.__typeIndex]
-          if (typeof targetSchema === 'function') { // Primitive or base class
-            try {
-              data = targetSchema(data)
-            } catch(e) {
-              data = new targetSchema(data)
-            }
-          } else if (Array.isArray(targetSchema)) {
-            data = []
-            if (conf.populateArrays === true) {
-              if (conf.matchArray === 'pattern') {
-                for (let e of targetSchema) {
-                  data.push(e.create(conf))
-                }
-              } else if (conf.matchArray === 'any') {
-                data.push(targetSchema[0].create(conf))
-              }
-            }
-          } else if (typeof targetSchema === 'object') {
-            // Handle Schisma instances or plain objects
-            if (targetSchema instanceof Schisma) {
-              data = targetSchema.create(conf, data)
-            } else {
-              let ndata = {}
-              for (let key of Object.keys(targetSchema)) {
-                ndata[key] = targetSchema[key].create(conf, data[key])
-              }
-              data = ndata
-            }
+      let isRoot = false
+      if (err.where === '' || err.where === undefined) {
+        isRoot = true
+      }
+
+      if (this.__type === 'Object') {
+        if (err.code === SchismaResult.NO_MATCH) {
+          if (isRoot) {
+            data = this.create(conf, data)
+          } else {
+            data[err.where] = this.$typeof[err.__typeIndex][err.where].create(conf, data[err.where])
           }
-        } else if (err.code === SchismaResult.UNEXPECTED_KEY) {
-          return undefined
-        } else if (err.code === SchismaResult.MISSING_KEY) {
-          let targetSchema = this.$typeof[0]
-          data = targetSchema.create(conf)
-        }
-      } else {
-        if (err.code === SchismaResult.PARTIAL_MATCH) {
-          if (this.__type === 'Object') {
+        } else if (err.code === SchismaResult.EXACT_MATCH) {
+        } else if (err.code === SchismaResult.PARTIAL_MATCH) {
+          if (isRoot) {
+            data = this.$typeof[err.__typeIndex][err.where]._conformFromErrors(data, err.errors, conf, fixedDotPaths)
+          } else {
             data[err.where] = this.$typeof[err.__typeIndex][err.where]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
-          } else if (this.__type === 'SchismaObject') {
-            data[err.where] = this.$typeof[err.__typeIndex]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
-          } else if (this.__type === 'Array') {
-            data[Number(err.where)] = this.$typeof[0][0].$typeof[err.__typeIndex]._conformFromErrors(data[Number(err.where)], err.errors, conf, fixedDotPaths)
-          } else if (this.__type === 'Class') {
-            throw 'Unexpected PARTIAL_MATCH Class'
-          } else if (this.__type === 'Primitive') {
-            throw 'Unexpected PARTIAL_MATCH Primitive'
-          }
-        } else if (err.code === SchismaResult.NO_MATCH) {
-          let targetSchema = this.$typeof[err.__typeIndex]
-          if (typeof targetSchema === 'function') { // Primitive or base class
-            try {
-              data[err.where] = targetSchema(data[err.where])
-            } catch(e) {
-              data[err.where] = new targetSchema(data[err.where])
-            }
-          } else if (Array.isArray(targetSchema)) {
-            data[err.where] = []
-            if (conf.populateArrays === true) {
-              if (conf.matchArray === 'pattern') {
-                for (let e of targetSchema) {
-                  data[err.where].push(e.create(conf))
-                }
-              } else if (conf.matchArray === 'any') {
-                data[err.where].push(targetSchema[0].create(conf))
-              }
-            }
-          } else if (typeof targetSchema === 'object') {
-            // Handle Schisma instances or plain objects
-            if (targetSchema instanceof Schisma) {
-              data[err.where] = targetSchema.create(conf, data[err.where])
-            } else {
-              for (let key of Object.keys(targetSchema)) {
-                data[key] = targetSchema[key].create(conf, data[key])
-              }
-            }
           }
         } else if (err.code === SchismaResult.UNEXPECTED_KEY) {
-          // Where can be a number or a string depending on array or object.
-          if (typeof err.where === 'number') {
-            data.splice(err.where, 1)
+          if (isRoot) {
+            throw `Unhandled: ${err.code}:${this.__type} root`
           } else {
             delete data[err.where]
           }
         } else if (err.code === SchismaResult.MISSING_KEY) {
-          let targetSchema = this.$typeof[0][err.where]
-          data[err.where] = targetSchema.create(conf)
+          if (isRoot) {
+            let targetSchema = this.$typeof[err.__typeIndex!==undefined?err.__typeIndex:0][err.where]
+            data = targetSchema.create(conf)
+          } else {
+            let targetSchema = this.$typeof[err.__typeIndex!==undefined?err.__typeIndex:0][err.where]
+            data[err.where] = targetSchema.create(conf)
+          }
+        } else {
+          throw `Unhandled: ${err.code}:${this.__type}`
         }
+      } else if (this.__type === 'SchismaObject') {
+        if (err.code === SchismaResult.NO_MATCH) {
+          if (isRoot) {
+            data = this.$typeof[err.__typeIndex].create(conf, data)
+          } else {
+            data[err.where] = this.$typeof[err.__typeIndex].create(conf, data[err.where])
+          }
+        } else if (err.code === SchismaResult.EXACT_MATCH) {
+        } else if (err.code === SchismaResult.PARTIAL_MATCH) {
+          if (isRoot) {
+            data = this.$typeof[err.__typeIndex]._conformFromErrors(data, err.errors, conf, fixedDotPaths)
+          } else {
+            if (this.$typeof[err.__typeIndex].__type === 'Array') {
+              data[err.where] = this.$typeof[0].$typeof[err.__typeIndex][0]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths) // <-- gets what we want.
+            } else {
+              data[err.where] = this.$typeof[err.__typeIndex]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
+            }
+          }
+        } else {
+          throw `Unhandled: ${err.code}:${this.__type}`
+        }
+      } else if (this.__type === 'Class') {
+        if (err.code === SchismaResult.NO_MATCH) {
+          if (isRoot) {
+            data = this.create(conf, data)
+          } else {
+            data[err.where] = this.create(conf, data[err.where])
+          }
+        } else if (err.code === SchismaResult.EXACT_MATCH) {
+        } else {
+          throw `Unhandled: ${err.code}:${this.__type}`
+        }
+      } else if (this.__type === 'Array') {
+        if (err.code === SchismaResult.NO_MATCH) {
+          if (isRoot) {
+            data = this.create(conf, data)
+          } else {
+            data[err.where] = this.$typeof[0][err.__typeIndex].create(conf, data[err.where])
+          }
+        } else if (err.code === SchismaResult.PARTIAL_MATCH) {
+          let targetSchema = this.$typeof[err.__typeIndex]
+          if (Array.isArray(targetSchema)) {
+            targetSchema = targetSchema[0]
+          }
+          if (isRoot) {
+            data = targetSchema._conformFromErrors(data, err.errors, conf, fixedDotPaths)
+          } else {
+            data[err.where] = targetSchema.$typeof[0][err.where]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
+          }
+        } else if (err.code === SchismaResult.UNEXPECTED_KEY) {
+          data.splice(err.where)
+        } else if (err.code === SchismaResult.MISSING_KEY) {
+          let targetSchema = this.$typeof[0][err.__typeIndex]
+          data[err.where] = targetSchema.create(conf, data[err.where])
+        } else {
+          throw `Unhandled: ${err.code}:${this.__type}`
+        }
+      } else if (this.__type === 'Primitive') {
+        throw `Unhandled: ${err.code}:${this.__type}`
+      } else {
+        throw `Unhandled: ${err.code}:${this.__type}`
       }
     }
     return data

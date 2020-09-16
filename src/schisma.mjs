@@ -362,14 +362,14 @@ class Schisma {
         }
       }
     } else if (results.code === SchismaResult.EXACT_MATCH) {
-      h += 1000
+      h += 2
       if (results.results) {
         for (let r of results.results) {
           h += this._getHeuristics(r)
         }
       }
     } else if (results.code === SchismaResult.NO_MATCH) {
-      h -= 1000
+      h -= 1
     } else if (results.isProblem()) {
       h -= 1
     } else {
@@ -447,10 +447,19 @@ class Schisma {
         }
       } else {
         if (err.code === SchismaResult.PARTIAL_MATCH) {
-          let targetSchema = this.$typeof[0][err.where]
-          data[err.where] = targetSchema.$typeof[err.__typeIndex]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
+          if (this.__type === 'Object') {
+            data[err.where] = this.$typeof[err.__typeIndex][err.where]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
+          } else if (this.__type === 'SchismaObject') {
+            data[err.where] = this.$typeof[err.__typeIndex]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
+          } else if (this.__type === 'Array') {
+            data[Number(err.where)] = this.$typeof[0][0].$typeof[err.__typeIndex]._conformFromErrors(data[Number(err.where)], err.errors, conf, fixedDotPaths)
+          } else if (this.__type === 'Class') {
+            throw 'Unexpected PARTIAL_MATCH Class'
+          } else if (this.__type === 'Primitive') {
+            throw 'Unexpected PARTIAL_MATCH Primitive'
+          }
         } else if (err.code === SchismaResult.NO_MATCH) {
-          let targetSchema = this.$typeof[err.__typeIndex][err.where]
+          let targetSchema = this.$typeof[err.__typeIndex]
           if (typeof targetSchema === 'function') { // Primitive or base class
             try {
               data[err.where] = targetSchema(data[err.where])
@@ -473,11 +482,9 @@ class Schisma {
             if (targetSchema instanceof Schisma) {
               data[err.where] = targetSchema.create(conf, data[err.where])
             } else {
-              let ndata = {}
               for (let key of Object.keys(targetSchema)) {
-                ndata[key] = targetSchema[key].create(conf, data[err.where][key])
+                data[key] = targetSchema[key].create(conf, data[key])
               }
-              data[err.where] = ndata
             }
           }
         } else if (err.code === SchismaResult.UNEXPECTED_KEY) {

@@ -1,6 +1,6 @@
 {
   "name": "schisma",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Schema validator, conformer, and object creator",
   "main": "dist/schisma.js",
   "scripts": {

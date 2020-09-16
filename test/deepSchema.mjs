@@ -26,7 +26,7 @@ let ContainerSchema = schisma({
   }]
 })
 
-test.failing('deep schema', t => {
+test('deep schema conform', t => {
   let expected = {
     variableChildren: [
       {
@@ -36,7 +36,28 @@ test.failing('deep schema', t => {
       {
         type: 'child b',
         data: {
-          aData: 'string'
+          aData: 32,
+        }
+      },
+      {
+        type: 'child b',
+        data: {
+          bData: 'b string'
+        }
+      }
+    ]
+  }
+
+  let bogus = {
+    variableChildren: [
+      {
+        type: 'child a',
+        aData: 'a string'
+      },
+      {
+        type: 'child b',
+        data: {
+          aData: '32'
         }
       },
       {
@@ -47,6 +68,5 @@ test.failing('deep schema', t => {
       }
     ]
   }
-  console.log(ContainerSchema.conform(expected))
-  console.log('wowww')
+  return t.deepEqual(expected, ContainerSchema.conform(expected))
 })

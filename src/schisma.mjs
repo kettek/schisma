@@ -250,7 +250,7 @@ class Schisma {
               if (search.test(objKey)) {
                 let checkResults = []
                 for (let valueType of type[searchKey]) {
-                  checkResults.push(valueType._validate(o[objKey], conf, `${objKey}`))
+                  checkResults.push(valueType._validate(o[objKey], conf, objKey))
                 }
                 let bestResult = this._getBestResult(checkResults)
                 if (!pendingObjectKeyResults[objKey]) {
@@ -296,7 +296,7 @@ class Schisma {
               where: key,
             }))
           } else {
-            let checkResults = type[key]._validate(o[key], conf, `${key}`)
+            let checkResults = type[key]._validate(o[key], conf, key)
             if (checkResults.isProblem()) {
               matchErrors.push(checkResults)
             } else {
@@ -480,14 +480,16 @@ class Schisma {
             data[err.where] = this.$typeof[0][err.__typeIndex].create(conf, data[err.where])
           }
         } else if (err.code === SchismaResult.PARTIAL_MATCH) {
-          let targetSchema = this.$typeof[err.__typeIndex]
+          let targetSchema = this.$typeof[0]
           if (Array.isArray(targetSchema)) {
-            targetSchema = targetSchema[0]
+            targetSchema = targetSchema[err.__typeIndex].$typeof[0][0]
+          } else {
+            targetSchema = targetSchema.$typeof[err.__typeIndex]
           }
           if (isRoot) {
             data = targetSchema._conformFromErrors(data, err.errors, conf, fixedDotPaths)
           } else {
-            data[err.where] = targetSchema.$typeof[0][err.where]._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
+            data[err.where] = targetSchema._conformFromErrors(data[err.where], err.errors, conf, fixedDotPaths)
           }
         } else if (err.code === SchismaResult.UNEXPECTED_KEY) {
           data.splice(err.where)

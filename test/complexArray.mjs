@@ -22,11 +22,13 @@ test('Complex Array parts mismatch', t => {
     parts: [1],
     deepParts: [
       [0, 32, 0, 0],
+      [0, 64, 0, 0],
     ],
   }, complexSchema.conform({
     parts: ['1'],
     deepParts: [
       [0, '32', 'whoops', {key: 'value'}],
+      [0, '64', 'whoops', {key: 'value'}],
     ],
   }, {populateArrays: true}))
 })

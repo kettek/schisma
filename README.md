@@ -36,6 +36,7 @@ let mySchema = schisma({
 Objects passed to schisma can be declared a variety of ways.
 
   * As a primitive type.
+  * As a null value.
   * As a containing object.
   * As a schisma-style object.
   * As a Schisma instance.
@@ -48,6 +49,18 @@ The simplest way of declaring the value a key is supposed to represent is with a
 {
   name: String,
   age:  Number,
+}
+```
+
+##### Null Value
+Null values can be used to declare a field to be null or, if as part of a $typeof Array, that it can be null or otherwise.
+
+```
+{
+  alwaysNull: null,
+  age: {
+    $typeof: [Number, null]
+  }
 }
 ```
 

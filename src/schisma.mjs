@@ -31,6 +31,10 @@ class Schisma {
     } else if (Array.isArray(o)) {
       this.$typeof    = [o.map(t=>new Schisma(t))]
       this.__type     = 'Array'
+    } else if (o === null) {
+      this.$default = null
+      this.$typeof  = [Schisma.Null]
+      this.__type   = 'Null'
     } else if (typeof o === 'object') {
       if (o.$typeof !== undefined || o.$type !== undefined || o.$validate !== undefined) {
         if (o.$typeof !== undefined) {
@@ -501,6 +505,8 @@ class Schisma {
         }
       } else if (this.__type === 'Primitive') {
         throw `Unhandled: ${err.code}:${this.__type}`
+      } else if (this.__type === 'Null') {
+        data = null
       } else {
         throw `Unhandled: ${err.code}:${this.__type}`
       }
@@ -557,6 +563,8 @@ class Schisma {
           return type(0)
         } else if (type === Boolean) {
           return type(false)
+        } else if (type === Schisma.Null) {
+          return null
         }
       }
       if (type === Number) {
@@ -579,6 +587,8 @@ class Schisma {
         return type(data)
       } else if (type === Boolean) {
         return type(data)
+      } else if (type === Schisma.Null) {
+        return null
       }
       try {
         data = type(data)
@@ -652,6 +662,9 @@ class Schisma {
       return v
     }
   }
+}
+Schisma.Null = function() {
+  return null
 }
 
 function schisma(newSchema) {

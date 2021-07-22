@@ -2,7 +2,7 @@ import test from 'ava'
 import schisma from '../src/schisma.mjs'
 
 const primitives = [
-  Number, BigInt, String, Boolean,
+  Number, BigInt, String, Boolean, schisma.Schisma.Null
 ]
 
 test('Primitives creation', t => {
@@ -58,7 +58,7 @@ test('Array of $typeof primitives', t => {
     mixedArray.push(primitive(1))
   }
 
-  return t.deepEqual([1, 1n, '1', true], schema.conform(mixedArray))
+  return t.deepEqual([1, 1n, '1', true, null], schema.conform(mixedArray))
 })
 
 test('Array of arrays of $typeof primitives', t => {
@@ -73,5 +73,5 @@ test('Array of arrays of $typeof primitives', t => {
     }
   }
 
-  return t.deepEqual([[1, 1n, '1', true], [1, 1n, '1', true], [1, 1n, '1', true], [1, 1n, '1', true]], schema.conform(mixedArray))
+  return t.deepEqual([[1, 1n, '1', true, null], [1, 1n, '1', true, null], [1, 1n, '1', true, null], [1, 1n, '1', true, null], [1, 1n, '1', true, null]], schema.conform(mixedArray))
 })

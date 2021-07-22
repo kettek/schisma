@@ -237,6 +237,15 @@ class Schisma {
             __typeIndex: typeIndex,
           }))
           continue
+        } else if (o === null) {
+          typesResults.push(new SchismaResult(SchismaResult.NO_MATCH, {
+            where: dot,
+            expected: 'object',
+            received: 'null',
+            value: o,
+            __typeIndex: typeIndex,
+          }))
+          continue
         }
         //
         let matchResults = [], matchErrors = []
